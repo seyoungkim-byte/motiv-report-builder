@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>{{ headline }} | {{ campaign.advertiser }} 케이스스터디</title>
+<meta name="description" content="{{ (narrative.summary or narrative.overview)[:160] }}">
+<meta property="og:title" content="{{ headline }}">
+<meta property="og:description" content="{{ (narrative.summary or narrative.overview)[:200] }}">
+{% if hero_image_url %}<meta property="og:image" content="{{ hero_image_url }}">{% endif %}
+<style>{{ css | safe }}</style>
+<script type="application/ld+json">
+{{ jsonld | safe }}
+</script>
+</head>
+<body>
+<article class="cs">
+
+  <header class="cs-top">
+    <div class="cs-top__text">
+      <p class="cs-eyebrow">{{ company.name }} Official Case Study</p>
+      <h1 class="cs-headline">{{ headline }}</h1>
+      {% if subhead %}<p class="cs-subhead">{{ subhead }}</p>{% endif %}
+      <hr class="cs-rule">
+    </div>
+    {% if hero_image_url %}
+    <div class="cs-top__hero"><img src="{{ hero_image_url }}" alt=""></div>
+    {% endif %}
+  </header>
+
+  {% if campaign.metrics_table %}
+  <section class="cs-stats" aria-label="핵심 지표">
+    {% for m in campaign.metrics_table[:4] %}
+    <div class="cs-stat">
+      <span class="cs-stat__label">{{ m.indicator }}</span>
+      <span class="cs-stat__value">{{ m.value }}</span>
+      {% if m.note %}<span class="cs-stat__note">{{ m.note }}</span>{% endif %}
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <div class="cs-grid">
+    <div class="cs-col cs-col--left">
+
+      {% if narrative.summary %}
+      <section class="cs-summary">
+        <h2>요약</h2>
+        <p>{{ narrative.summary }}</p>
+      </section>
+      {% endif %}
+
+      <section class="cs-section">
+        <h2><span class="cs-h2__icon">📌</span>01. 캠페인 개요</h2>
+        <p>{{ narrative.overview }}</p>
+      </section>
+
+      <section class="cs-section">
+        <h2><span class="cs-h2__icon">🎯</span>02. 광고 집행 배경</h2>
+        <p>{{ narrative.background }}</p>
+      </section>
+
+      <section class="cs-section">
+        <h2><span class="cs-h2__icon">💡</span>03. 적용 전략</h2>
+        <p>{{ narrative.strategy }}</p>
+      </section>
+    </div>
+
+    <div class="cs-col cs-col--right">
+      {% if campaign.metrics_table %}
+      <section class="cs-section">
+        <h2><span class="cs-h2__icon">📊</span>04. 캠페인 성과</h2>
+        <table class="cs-metrics">
+          <thead>
+            <tr><th>성과 지표</th><th>성과</th><th>비고</th></tr>
+          </thead>
+          <tbody>
+            {% for m in campaign.metrics_table %}
+            <tr>
+              <td class="cs-metrics__indicator">{{ m.indicator }}</td>
+              <td class="cs-metrics__value">{{ m.value }}</td>
+              <td class="cs-metrics__note">{{ m.note }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+      {% endif %}
+
+      {% if narrative.insights %}
+      <section class="cs-section">
+        <h2><span class="cs-h2__icon">✨</span>05. 인사이트</h2>
+        <ul class="cs-insights">
+          {% for item in narrative.insights %}
+          <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+      </section>
+      {% endif %}
+
+      <aside class="cs-about">
+        <h3>About {{ company.name }}</h3>
+        <p>{{ company.description }}</p>
+      </aside>
+    </div>
+  </div>
+
+  <footer class="cs-footer">
+    <div class="cs-footer__brand">{{ company.name }}</div>
+    <div class="cs-footer__links">
+      Website: <a href="{{ company.url }}">{{ company.url }}</a>
+      {% if company.url_secondary %}, <a href="{{ company.url_secondary }}">{{ company.url_secondary }}</a>{% endif %}
+      &nbsp;|&nbsp; Contact Us: <a href="mailto:{{ company.press_contact_email }}">{{ company.press_contact_email }}</a>
+    </div>
+    <div class="cs-footer__copy">© {{ year }} {{ company.name }} Inc. All Rights Reserved.</div>
+  </footer>
+</article>
+</body>
+</html>

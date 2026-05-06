@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>{{ headline }}</title>
+<style>{{ css | safe }}</style>
+</head>
+<body>
+<section class="page">
+
+  <header class="p-top">
+    <div class="p-top__text">
+      <p class="p-eyebrow">{{ company.name }} Official Case Study</p>
+      <h1>{{ headline }}</h1>
+      {% if subhead %}<p class="p-subhead">{{ subhead }}</p>{% endif %}
+      <hr class="p-rule">
+    </div>
+    {% if hero_image_url %}
+    <div class="p-top__hero"><img src="{{ hero_image_url }}" alt=""></div>
+    {% endif %}
+  </header>
+
+  {% if campaign.metrics_table %}
+  <section class="p-stats">
+    {% for m in campaign.metrics_table[:4] %}
+    <div class="p-stat">
+      <span class="p-stat__label">{{ m.indicator }}</span>
+      <span class="p-stat__value">{{ m.value }}</span>
+      {% if m.note %}<span class="p-stat__note">{{ m.note }}</span>{% endif %}
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <div class="p-grid">
+    <div class="p-col p-col--left">
+      {% if narrative.summary %}
+      <section class="p-summary">
+        <h2>요약</h2>
+        <p>{{ narrative.summary }}</p>
+      </section>
+      {% endif %}
+
+      <h2><span class="p-h2__icon">📌</span>01. 캠페인 개요</h2>
+      <p>{{ narrative.overview }}</p>
+
+      <h2><span class="p-h2__icon">🎯</span>02. 광고 집행 배경</h2>
+      <p>{{ narrative.background }}</p>
+
+      <h2><span class="p-h2__icon">💡</span>03. 적용 전략</h2>
+      <p>{{ narrative.strategy }}</p>
+    </div>
+
+    <div class="p-col p-col--right">
+      {% if campaign.metrics_table %}
+      <h2><span class="p-h2__icon">📊</span>04. 캠페인 성과</h2>
+      <table class="p-metrics">
+        <thead>
+          <tr><th>성과 지표</th><th>성과</th><th>비고</th></tr>
+        </thead>
+        <tbody>
+          {% for m in campaign.metrics_table %}
+          <tr>
+            <td class="p-metrics__indicator">{{ m.indicator }}</td>
+            <td class="p-metrics__value">{{ m.value }}</td>
+            <td class="p-metrics__note">{{ m.note }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+
+      {% if narrative.insights %}
+      <h2><span class="p-h2__icon">✨</span>05. 인사이트</h2>
+      <ul class="p-insights">
+        {% for item in narrative.insights %}
+        <li>{{ item }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+      <aside class="p-about">
+        <h3>About {{ company.name }}</h3>
+        <p>{{ company.description }}</p>
+      </aside>
+    </div>
+  </div>
+
+  <footer class="p-footer">
+    <span class="p-footer__brand">{{ company.name }}</span>
+    <span class="p-footer__links">
+      Website: {{ company.url }}{% if company.url_secondary %}, {{ company.url_secondary }}{% endif %}
+      &nbsp;|&nbsp; Contact Us: {{ company.press_contact_email }}
+    </span>
+    <span class="p-footer__copy">© {{ year }} {{ company.name }} Inc. All Rights Reserved.</span>
+  </footer>
+</section>
+</body>
+</html>

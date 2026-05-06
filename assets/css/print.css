@@ -1,0 +1,110 @@
+/* Print (PDF) — A4 single-page, mirrors the reference layout. */
+@page { size: A4; margin: 0; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font: 9.5pt/1.5 "Malgun Gothic", "Pretendard", "Apple SD Gothic Neo", sans-serif;
+  color: #1d1f1a;
+  background: #ffffff;
+}
+.page {
+  width: 210mm;
+  height: 297mm;
+  padding: 10mm 12mm 8mm;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Top band */
+.p-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 6mm;
+  background: #f5efe4;
+  padding: 6mm 7mm;
+  border-radius: 2.5mm;
+  margin-bottom: 4mm;
+}
+.p-top__hero img { width: 100%; height: 46mm; object-fit: cover; border-radius: 2mm; }
+.p-eyebrow { margin: 0 0 1.5mm; color: #7d8c4e; font-size: 8pt; font-weight: 700; letter-spacing: .04em; }
+.p-top h1 { margin: 0 0 1.5mm; font-size: 18pt; line-height: 1.18; font-weight: 800; }
+.p-subhead { margin: 0 0 2mm; color: #6b6f63; font-size: 9.5pt; }
+.p-rule { border: 0; border-top: .5mm solid #7d8c4e; margin: 0; width: 14mm; }
+
+/* ── Hero stat strip */
+.p-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2mm;
+  margin-bottom: 4mm;
+}
+.p-stat {
+  background: #f5efe4;
+  border-top: 0.5mm solid #7d8c4e;
+  border-radius: 1.5mm;
+  padding: 2.2mm 2.5mm;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6mm;
+}
+.p-stat__label { font-size: 7pt; color: #6b6f63; }
+.p-stat__value { font-size: 12pt; font-weight: 800; color: #4e5a2d; line-height: 1.15; }
+.p-stat__note  { font-size: 6.8pt; color: #6b6f63; line-height: 1.3; }
+
+/* ── Two-column body */
+.p-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 7mm;
+  flex: 1;
+}
+.p-col h2, .p-col > h2 { font-size: 10.5pt; margin: 0 0 1.5mm; color: #4e5a2d; font-weight: 700; display: inline-flex; align-items: baseline; gap: 1.5mm; }
+.p-h2__icon { font-size: 9pt; }
+.p-col p { margin: 0 0 3mm; font-size: 9pt; line-height: 1.5; }
+.p-summary {
+  background: #f5efe4;
+  border-left: 1mm solid #7d8c4e;
+  padding: 2.5mm 3mm;
+  border-radius: 1.5mm;
+  margin-bottom: 3mm;
+}
+.p-summary h2 { margin: 0 0 1mm; font-size: 10pt; color: #4e5a2d; }
+.p-summary p { margin: 0; font-size: 8.8pt; line-height: 1.45; }
+
+/* ── Results table */
+.p-metrics { width: 100%; border-collapse: collapse; font-size: 8.2pt; margin-bottom: 3mm; }
+.p-metrics thead th {
+  background: #7d8c4e;
+  color: #fff;
+  font-weight: 600;
+  text-align: left;
+  padding: 1.5mm 2mm;
+}
+.p-metrics tbody td { border-bottom: .2mm solid #dfd9ca; padding: 1.2mm 2mm; vertical-align: top; }
+.p-metrics__indicator { font-weight: 500; }
+.p-metrics__value { color: #4e5a2d; font-weight: 700; white-space: nowrap; }
+.p-metrics__note { color: #6b6f63; font-size: 7.8pt; }
+
+/* ── Insights */
+.p-insights { padding-left: 4mm; margin: 0 0 3mm; }
+.p-insights li { margin-bottom: 1.5mm; font-size: 8.8pt; line-height: 1.45; }
+.p-insights li::marker { color: #7d8c4e; }
+
+/* ── About */
+.p-about { background: #f5efe4; border-radius: 2mm; padding: 2.5mm 3mm; margin-top: 2mm; }
+.p-about h3 { margin: 0 0 1mm; font-size: 9pt; color: #4e5a2d; }
+.p-about p { margin: 0; font-size: 8.2pt; line-height: 1.45; }
+
+/* ── Footer */
+.p-footer {
+  border-top: .3mm solid #dfd9ca;
+  padding-top: 1.5mm;
+  margin-top: 2mm;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2mm;
+  font-size: 7.5pt;
+  color: #6b6f63;
+}
+.p-footer__brand { font-weight: 700; color: #4e5a2d; }
