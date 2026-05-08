@@ -3,7 +3,10 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
-  font: 9.5pt/1.5 "Malgun Gothic", "Pretendard", "Apple SD Gothic Neo", sans-serif;
+  /* CJK fallback: Noto Sans CJK KR is the system Korean font on Linux
+     (apt: fonts-noto-cjk). Keeps Windows/Mac users on their native fonts. */
+  font: 9.5pt/1.5 "Malgun Gothic", "Pretendard", "Apple SD Gothic Neo",
+                  "Noto Sans CJK KR", "Noto Sans KR", "Noto Sans", sans-serif;
   color: #1d1f1a;
   background: #ffffff;
 }
