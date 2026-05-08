@@ -3,10 +3,14 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
-  /* CJK fallback: Noto Sans CJK KR is the system Korean font on Linux
-     (apt: fonts-noto-cjk). Keeps Windows/Mac users on their native fonts. */
+  /* CJK + Emoji fallback chain.
+       Korean: Malgun(Win) → Apple SD(Mac) → Noto CJK(Linux) → Pretendard
+       Emoji: Noto Color Emoji (Linux container 에 apt 로 설치)
+     Chromium 은 한 글자가 위 family 로 못 그려지면 emoji family 로 폴백. */
   font: 9.5pt/1.5 "Malgun Gothic", "Pretendard", "Apple SD Gothic Neo",
-                  "Noto Sans CJK KR", "Noto Sans KR", "Noto Sans", sans-serif;
+                  "Noto Sans CJK KR", "Noto Sans KR", "Noto Sans",
+                  "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji",
+                  sans-serif;
   color: #1d1f1a;
   background: #ffffff;
 }
