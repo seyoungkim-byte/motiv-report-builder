@@ -21,7 +21,7 @@ from ai import NARRATIVE_SECTIONS, generate_hero_image, generate_narrative
 from ai.narrative import INSIGHTS_KEY, INSIGHTS_LABEL
 from auth import logout, require_auth
 from config import load_settings
-from data import CampaignData, CampaignRepository, MetricRow
+from data import CampaignData, CampaignRepository, MetricRow, load_build, save_build
 from render import (
     html_to_pdf,
     render_press_docx,
@@ -129,8 +129,50 @@ def _reset_campaign_state(data: CampaignData):
     st.session_state.headline = ""
     st.session_state.subhead = ""
     st.session_state.hero_path = None
+    st.session_state.last_build = None
     if "metrics_editor" in st.session_state:
         del st.session_state["metrics_editor"]
+
+    # 같은 캠페인의 이전 빌드가 Supabase 에 있으면 모두 복원 (소스 + 산출물).
+    saved = load_build(data.campaign_no)
+    if not saved:
+        return
+
+    src = saved
+    st.session_state.headline = src.get("headline") or st.session_state.headline
+    st.session_state.subhead = src.get("subhead") or ""
+    st.session_state.context_prose = src.get("context_prose") or ""
+    nar = src.get("narrative") or {}
+    if nar:
+        st.session_state.narrative = nar
+        for k, _ in NARRATIVE_SECTIONS:
+            st.session_state[f"nar_{k}"] = nar.get(k, "")
+        st.session_state["nar_insights"] = "\n".join(nar.get(INSIGHTS_KEY, []))
+
+    saved_metrics = src.get("metrics_table") or []
+    if saved_metrics:
+        st.session_state.metrics_df = pd.DataFrame(saved_metrics)
+
+    # 히어로 이미지 — 디스크에 다시 써서 기존 path-기반 UI 가 그대로 동작
+    hero_bytes = src.get("hero_image")
+    if hero_bytes:
+        hero_dir: Path = settings.output_dir / "hero"
+        hero_dir.mkdir(parents=True, exist_ok=True)
+        hero_path = hero_dir / f"hero_{data.campaign_no}_restored.png"
+        try:
+            hero_path.write_bytes(hero_bytes)
+            st.session_state.hero_path = str(hero_path)
+        except Exception:
+            pass
+
+    # 4 산출물 다운로드 블롭
+    if src.get("files"):
+        st.session_state.last_build = {
+            "campaign_no": data.campaign_no,
+            "out_dir": "(saved)",
+            "files": src["files"],
+            "built_at": src.get("built_at"),
+        }
 
 
 with st.sidebar:
@@ -334,7 +376,14 @@ with col_r:
     out_dir: Path = settings.output_dir / campaign.campaign_no
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    if st.button("4개 파일 한번에 빌드", type="primary", width="stretch"):
+    # 같은 캠페인의 저장된 빌드가 이미 있으면 버튼은 '재생성' 으로 라벨 변경.
+    _has_saved_build = bool(
+        (lb := st.session_state.get("last_build"))
+        and lb.get("campaign_no") == campaign.campaign_no
+    )
+    _build_label = "🔄 재생성 (이전 빌드 덮어쓰기)" if _has_saved_build else "📄 4개 파일 한번에 빌드"
+
+    if st.button(_build_label, type="primary", width="stretch"):
         # Guard: narrative must be filled in. Hitting build before generating
         # results in a report with section headers but no body text.
         has_narrative = any(
@@ -388,20 +437,48 @@ with col_r:
         docx = render_press_docx(context, out_dir / "press_release.docx")
         txt = render_press_txt(context, out_dir / "press_release.txt")
 
-        # 산출물 바이트 + 파일명을 session_state 에 저장 → 다른 위젯 클릭으로
-        # rerun 돼도 다운로드 버튼이 살아남도록. 디스크 임시파일은 휘발돼도
-        # 메모리 데이터로 다운로드 가능.
+        # 1) 산출물을 메모리에 보관 (rerun 으로 디스크 휘발돼도 다운로드 가능)
+        html_bytes = web_html.read_bytes()
+        pdf_bytes = pdf.read_bytes()
+        docx_bytes = docx.read_bytes()
+        txt_bytes = txt.read_bytes()
         st.session_state.last_build = {
             "campaign_no": campaign.campaign_no,
             "out_dir": str(out_dir),
             "files": [
-                ("HTML", web_html.read_bytes(), web_html.name),
-                ("PDF",  pdf.read_bytes(),       pdf.name),
-                ("DOCX", docx.read_bytes(),      docx.name),
-                ("TXT",  txt.read_bytes(),       txt.name),
+                ("HTML", html_bytes, web_html.name),
+                ("PDF",  pdf_bytes,  pdf.name),
+                ("DOCX", docx_bytes, docx.name),
+                ("TXT",  txt_bytes,  txt.name),
             ],
         }
-        st.success(f"완료 → {out_dir}")
+
+        # 2) Supabase 에 영속화 — 다음 세션·다른 사용자도 같은 캠페인 재방문 시
+        #    바로 다운로드 가능하게.
+        hero_bytes = None
+        if st.session_state.hero_path:
+            try:
+                hero_bytes = Path(st.session_state.hero_path).read_bytes()
+            except Exception:
+                hero_bytes = None
+        ok = save_build(
+            campaign_no=campaign.campaign_no,
+            user_email=user_email,
+            headline=st.session_state.headline,
+            subhead=st.session_state.subhead,
+            context_prose=st.session_state.context_prose,
+            narrative=st.session_state.narrative,
+            metrics_table=df.to_dict(orient="records"),
+            hero_image=hero_bytes,
+            html=html_bytes,
+            pdf=pdf_bytes,
+            docx=docx_bytes,
+            txt=txt_bytes,
+        )
+        if ok:
+            st.success(f"완료 → {out_dir}  ·  Supabase 에 저장됨 (다음 접속 때 자동 복원)")
+        else:
+            st.warning(f"완료 → {out_dir}  ·  ⚠️ Supabase 저장 실패 (다운로드는 이번 세션에서 가능)")
 
     # 빌드 결과 다운로드 영역 — 버튼 핸들러 밖에 있어서 rerun 후에도 유지
     last = st.session_state.get("last_build")

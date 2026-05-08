@@ -42,20 +42,29 @@ def generate_image_bytes(prompt: str) -> bytes:
         generation_config={"response_modalities": ["Text", "Image"]},
     )
 
+    text_returned: list[str] = []
     for cand in getattr(resp, "candidates", []) or []:
         content = getattr(cand, "content", None)
         for part in (getattr(content, "parts", None) or []):
             inline = getattr(part, "inline_data", None)
             data = getattr(inline, "data", None) if inline else None
-            if not data:
-                continue
-            # SDK normally returns bytes; some versions return base64 str.
-            if isinstance(data, (bytes, bytearray)):
-                return bytes(data)
-            if isinstance(data, str):
-                return base64.b64decode(data)
+            if data:
+                if isinstance(data, (bytes, bytearray)):
+                    return bytes(data)
+                if isinstance(data, str):
+                    return base64.b64decode(data)
+            text = getattr(part, "text", None)
+            if text:
+                text_returned.append(text)
+
+    text_dump = " | ".join(text_returned).strip()[:500] or "(empty)"
     raise RuntimeError(
-        f"Gemini model '{s.gemini_image_model}' returned no inline image data. "
-        "Confirm GEMINI_IMAGE_MODEL is an image-output model "
-        "(e.g. gemini-2.5-flash-image-preview)."
+        f"Gemini 모델 '{s.gemini_image_model}' 가 이미지 대신 텍스트만 반환했습니다.\n\n"
+        f"모델 텍스트 응답:\n{text_dump}\n\n"
+        "확인사항:\n"
+        " 1) GEMINI_IMAGE_MODEL 이 이미지 출력 가능한 모델인지 (현재 알려진: "
+        "gemini-2.5-flash-image, gemini-2.5-flash-image-preview, "
+        "gemini-2.0-flash-exp-image-generation)\n"
+        " 2) 해당 모델이 사용자 리전에서 이미지 생성 활성화돼 있는지\n"
+        " 3) 프롬프트에 안전 필터에 걸릴 내용이 없는지"
     )
