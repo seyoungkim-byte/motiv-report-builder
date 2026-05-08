@@ -388,12 +388,32 @@ with col_r:
         docx = render_press_docx(context, out_dir / "press_release.docx")
         txt = render_press_txt(context, out_dir / "press_release.txt")
 
+        # 산출물 바이트 + 파일명을 session_state 에 저장 → 다른 위젯 클릭으로
+        # rerun 돼도 다운로드 버튼이 살아남도록. 디스크 임시파일은 휘발돼도
+        # 메모리 데이터로 다운로드 가능.
+        st.session_state.last_build = {
+            "campaign_no": campaign.campaign_no,
+            "out_dir": str(out_dir),
+            "files": [
+                ("HTML", web_html.read_bytes(), web_html.name),
+                ("PDF",  pdf.read_bytes(),       pdf.name),
+                ("DOCX", docx.read_bytes(),      docx.name),
+                ("TXT",  txt.read_bytes(),       txt.name),
+            ],
+        }
         st.success(f"완료 → {out_dir}")
-        for label, p in [("HTML", web_html), ("PDF", pdf), ("DOCX", docx), ("TXT", txt)]:
-            with open(p, "rb") as f:
+
+    # 빌드 결과 다운로드 영역 — 버튼 핸들러 밖에 있어서 rerun 후에도 유지
+    last = st.session_state.get("last_build")
+    if last and last.get("campaign_no") == campaign.campaign_no:
+        st.caption(f"📦 마지막 빌드: `{last['out_dir']}`")
+        cols = st.columns(len(last["files"]))
+        for i, (label, data, fname) in enumerate(last["files"]):
+            with cols[i]:
                 st.download_button(
                     f"{label} 다운로드",
-                    data=f.read(),
-                    file_name=p.name,
-                    key=f"dl_{label}",
+                    data=data,
+                    file_name=fname,
+                    key=f"dl_{label}_{campaign.campaign_no}",
+                    width="stretch",
                 )
