@@ -31,31 +31,60 @@ from render import (
 )
 
 
-def _ensure_playwright_chromium():
-    """Install Chromium on first run if missing (for Streamlit Cloud).
+_CHROMIUM_INSTALLED = False
 
-    Local dev: no-op when ~/.cache/ms-playwright is already populated.
-    Cloud first-boot: downloads Chromium (~150MB, 30~60s), then cached.
+
+def _find_chromium_binary() -> str | None:
+    """Look for the actual Chromium executable, not just the cache dir.
+
+    `playwright install` can leave a partially-populated chromium-* dir
+    even when the binary failed to download — the dir-only check is too
+    optimistic and skips a needed reinstall.
     """
     import os
-    import subprocess
     cache = os.path.expanduser("~/.cache/ms-playwright")
+    if not os.path.isdir(cache):
+        return None
     try:
-        if os.path.isdir(cache) and any(
-            d.startswith("chromium") for d in os.listdir(cache)
-        ):
-            return
-    except Exception:
-        pass
+        candidates = sorted(
+            d for d in os.listdir(cache) if d.startswith("chromium")
+        )
+    except OSError:
+        return None
+    for d in candidates:
+        for tail in ("chrome-linux/chrome", "chrome-mac/Chromium.app/Contents/MacOS/Chromium",
+                     "chrome-win/chrome.exe"):
+            p = os.path.join(cache, d, tail)
+            if os.path.isfile(p):
+                return p
+    return None
+
+
+def _ensure_playwright_chromium():
+    """Install Chromium on first run if the actual binary is missing.
+
+    Local dev: no-op when chrome-linux/chrome already exists.
+    Cloud first-boot or rebuild: downloads Chromium (~150MB, 30~60s).
+    Idempotent within a process via _CHROMIUM_INSTALLED flag.
+    """
+    global _CHROMIUM_INSTALLED
+    if _CHROMIUM_INSTALLED:
+        return
+    if _find_chromium_binary():
+        _CHROMIUM_INSTALLED = True
+        return
+    import subprocess
     try:
         subprocess.run(
             ["playwright", "install", "chromium"],
             check=False,
-            timeout=300,
+            timeout=600,
             capture_output=True,
         )
     except Exception:
-        pass  # PDF will fail but the rest of the app still works
+        pass
+    if _find_chromium_binary():
+        _CHROMIUM_INSTALLED = True
 
 
 _ensure_playwright_chromium()
