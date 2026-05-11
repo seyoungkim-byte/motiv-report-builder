@@ -46,6 +46,54 @@ def handle_oauth_callback():
         st.rerun()
 
 
+def _jwt_expired_or_near(token: str | None, leeway_sec: int = 60) -> bool:
+    """Decode JWT exp claim without verifying signature. True if expired or
+    within leeway_sec seconds of expiring."""
+    if not token:
+        return True
+    try:
+        import base64
+        import json
+        import time
+        payload_b64 = token.split(".")[1]
+        payload_b64 += "=" * (-len(payload_b64) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+        return time.time() >= (payload.get("exp", 0) - leeway_sec)
+    except Exception:
+        return True
+
+
+def _maybe_refresh_session():
+    """Silently refresh the Supabase session if access_token is expired/expiring.
+
+    Called from require_auth() on every request. If refresh fails (refresh
+    token itself expired), the user gets bounced back to the login screen
+    on the next gate check.
+    """
+    token = st.session_state.get("access_token")
+    if not _jwt_expired_or_near(token):
+        return
+    refresh = st.session_state.get("refresh_token")
+    if not refresh:
+        return
+    client = get_client()
+    if not client:
+        return
+    try:
+        result = client.auth.refresh_session(refresh)
+        sess = getattr(result, "session", None) or result
+        new_access = getattr(sess, "access_token", None)
+        new_refresh = getattr(sess, "refresh_token", None)
+        if new_access:
+            st.session_state.access_token = new_access
+        if new_refresh:
+            st.session_state.refresh_token = new_refresh
+    except Exception:
+        # Refresh failed — clear session so the next gate forces re-login.
+        for k in ("access_token", "refresh_token", "user_email", "auth_handled"):
+            st.session_state.pop(k, None)
+
+
 def render_login_screen():
     s = load_settings()
     st.title("📄 Case Study Report Builder")
@@ -124,6 +172,7 @@ def logout():
 def require_auth() -> str:
     """Gate the app. Returns the authenticated email or `st.stop()`s."""
     handle_oauth_callback()
+    _maybe_refresh_session()
 
     user_email = st.session_state.get("user_email")
     if not user_email:

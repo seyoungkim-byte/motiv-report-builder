@@ -246,18 +246,24 @@ col_l, col_r = st.columns([0.55, 0.45])
 
 with col_l:
     st.subheader("2. 헤드라인 & 서브헤드")
-    st.session_state.headline = st.text_input(
+    # value= 와 session_state 재할당 패턴은 위젯 내부 상태와 충돌하기 쉬움
+    # (입력값이 한 rerun 늦거나 revert 되는 현상). key= 만으로 묶어 Streamlit
+    # 이 상태를 직접 소유하게 함. 기본값은 _reset_campaign_state 에서 설정.
+    if not st.session_state.get("headline"):
+        st.session_state["headline"] = (
+            f"{campaign.advertiser}, {campaign.campaign_name} 캠페인 사례"
+        )
+    st.text_input(
         "헤드라인",
-        st.session_state.headline
-        or f"{campaign.advertiser}, {campaign.campaign_name} 캠페인 사례",
+        key="headline",
         help="예시: '크로스디바이스 광고로 고객 획득 비용 53% 절감한 성인영양식 캠페인 사례'",
     )
-    st.session_state.subhead = st.text_input("서브헤드 (선택)", st.session_state.subhead)
+    st.text_input("서브헤드 (선택)", key="subhead")
 
     st.subheader("3. 캠페인 컨텍스트 & 내러티브")
-    st.session_state.context_prose = st.text_area(
+    st.text_area(
         "캠페인 컨텍스트 (자유 서술 — Claude가 1차 사실로 사용)",
-        value=st.session_state.context_prose,
+        key="context_prose",
         height=180,
         help=(
             "예: 'OO 캠페인은 X를 목표로 Y 오디언스를 타게팅하여 Z 방식으로 운영했고, "
