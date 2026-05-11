@@ -48,12 +48,35 @@
       <p>{{ narrative.background }}</p>
 
       <h2><span class="p-h2__icon">💡</span>03. 적용 전략</h2>
+      {% if charts.inline_strategy %}
+      <div class="p-inline-row">
+        <p class="p-inline-row__text">{{ narrative.strategy }}</p>
+        <figure class="p-inline-chart">
+          <img src="data:image/png;base64,{{ charts.inline_strategy.image_b64 }}" alt="{{ charts.inline_strategy.title }}">
+          {% if charts.inline_strategy.caption %}
+          <figcaption>{{ charts.inline_strategy.caption }}</figcaption>
+          {% endif %}
+        </figure>
+      </div>
+      {% else %}
       <p>{{ narrative.strategy }}</p>
+      {% endif %}
     </div>
 
     <div class="p-col p-col--right">
-      {% if campaign.metrics_table %}
       <h2><span class="p-h2__icon">📊</span>04. 캠페인 성과</h2>
+      {% if charts.performance %}
+      <div class="p-perf">
+        {% for ch in charts.performance %}
+        <figure class="p-perf-chart">
+          <img src="data:image/png;base64,{{ ch.image_b64 }}" alt="{{ ch.title }}">
+          {% if ch.caption %}
+          <figcaption>{{ ch.caption }}</figcaption>
+          {% endif %}
+        </figure>
+        {% endfor %}
+      </div>
+      {% elif campaign.metrics_table %}
       <table class="p-metrics">
         <thead>
           <tr><th>성과 지표</th><th>성과</th><th>비고</th></tr>

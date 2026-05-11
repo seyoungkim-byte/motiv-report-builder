@@ -41,9 +41,33 @@ def _build_jsonld(ctx: dict[str, Any]) -> str:
     return json.dumps(data, ensure_ascii=False, indent=2)
 
 
+def _split_charts(chart_set: Any) -> dict[str, Any]:
+    """Reshape the flat chart list into the structure templates expect:
+
+      {performance: list[spec], inline_strategy: spec | None}
+
+    Each entry has shape {template, placement, title, subtitle, caption,
+    data, image_b64}. The b64 is what the template actually inlines.
+    """
+    perf: list[dict[str, Any]] = []
+    inline: dict[str, Any] | None = None
+    if not chart_set:
+        return {"performance": perf, "inline_strategy": inline}
+    for spec in chart_set:
+        if not isinstance(spec, dict) or not spec.get("image_b64"):
+            continue
+        plc = spec.get("placement") or "performance"
+        if plc == "inline_strategy" and inline is None:
+            inline = spec
+        elif plc == "performance" and len(perf) < 2:
+            perf.append(spec)
+    return {"performance": perf, "inline_strategy": inline}
+
+
 def _enrich(context: dict[str, Any]) -> dict[str, Any]:
     ctx = dict(context)
     ctx.setdefault("year", _dt.date.today().year)
+    ctx["charts"] = _split_charts(ctx.get("chart_set"))
     return ctx
 
 

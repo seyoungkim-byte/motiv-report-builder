@@ -61,14 +61,37 @@
 
       <section class="cs-section">
         <h2><span class="cs-h2__icon">💡</span>03. 적용 전략</h2>
+        {% if charts.inline_strategy %}
+        <div class="cs-inline-row">
+          <p class="cs-inline-row__text">{{ narrative.strategy }}</p>
+          <figure class="cs-inline-chart">
+            <img src="data:image/png;base64,{{ charts.inline_strategy.image_b64 }}" alt="{{ charts.inline_strategy.title }}">
+            {% if charts.inline_strategy.caption %}
+            <figcaption>{{ charts.inline_strategy.caption }}</figcaption>
+            {% endif %}
+          </figure>
+        </div>
+        {% else %}
         <p>{{ narrative.strategy }}</p>
+        {% endif %}
       </section>
     </div>
 
     <div class="cs-col cs-col--right">
-      {% if campaign.metrics_table %}
       <section class="cs-section">
         <h2><span class="cs-h2__icon">📊</span>04. 캠페인 성과</h2>
+        {% if charts.performance %}
+        <div class="cs-perf">
+          {% for ch in charts.performance %}
+          <figure class="cs-perf-chart">
+            <img src="data:image/png;base64,{{ ch.image_b64 }}" alt="{{ ch.title }}">
+            {% if ch.caption %}
+            <figcaption>{{ ch.caption }}</figcaption>
+            {% endif %}
+          </figure>
+          {% endfor %}
+        </div>
+        {% elif campaign.metrics_table %}
         <table class="cs-metrics">
           <thead>
             <tr><th>성과 지표</th><th>성과</th><th>비고</th></tr>
@@ -83,8 +106,8 @@
             {% endfor %}
           </tbody>
         </table>
+        {% endif %}
       </section>
-      {% endif %}
 
       {% if narrative.insights %}
       <section class="cs-section">
