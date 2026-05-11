@@ -293,9 +293,13 @@ def funnel(spec: dict[str, Any]) -> str:
     w, h = _figsize(spec)
     fig, ax = plt.subplots(figsize=(w, h))
 
+    # Funnel widths: proportional, but clamped so the smallest bar still
+    # fits its label. For 노출→구매 funnels the ratio is often ~1000:1, so
+    # raw proportional widths make terminal stages invisible — we instead
+    # interpolate between the true ratio and a readable minimum.
+    MIN_W = 0.22
     y = list(range(len(stages)))
-    # Center each bar to suggest funnel taper
-    widths = [v / max_v for v in values]
+    widths = [max(v / max_v, MIN_W) for v in values]
     lefts = [(1 - wd) / 2 for wd in widths]
     # darker tone as we descend
     color_grad = []
@@ -379,11 +383,11 @@ def index_lift(spec: dict[str, Any]) -> str:
             ha="center", va="bottom",
             fontsize=11, fontweight="bold", color=OLIVE_DARK)
 
-    # Lift annotation
+    # Lift annotation (axes-fraction coords so it always sits near the top)
     lift_pct = idx - 100
     arrow = "▲" if lift_pct >= 0 else "▼"
     color = GOLD if lift_pct >= 0 else "#b35a3a"
-    ax.text(0.5, max_v * 0.92,
+    ax.text(0.5, 0.92,
             f"{arrow} {abs(lift_pct):.1f}p Lift",
             transform=ax.transAxes,
             ha="center", va="top",
