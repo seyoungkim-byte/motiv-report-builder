@@ -67,6 +67,19 @@ SYSTEM_PROMPT = """당신은 데이터 시각화 큐레이터입니다.
 - freq_distribution  : 빈도 구간별 분포 (1회/2회/3-4회/5+).
                        data = {buckets:[{name,value,share}...], total_label}
 
+[value_format 작성 규칙 — 중요]
+**Python str.format 패턴만 사용**. Excel/한글 패턴(#,##0 / 0.0% / +0.0% 등) 금지.
+좋은 예:
+  "{:+,.1f}%"      → +152.5%
+  "{:+.1f}p"       → +20.0p
+  "{:,.0f}명"       → 565,772명
+  "{:,.0f}원"       → 4,360원
+  "{:.2f}%"        → 0.27%
+나쁜 예:
+  "+#,##0.0%"      → Excel 코드, Python 이 처리 못 함
+  "+0.0%"          → Excel 코드, 잘못된 출력
+  "{value}%"       → 이름 있는 placeholder 금지, positional 만 사용
+
 [출력 스키마]
 charts: list. 각 항목:
   template   : 위 6개 중 하나
