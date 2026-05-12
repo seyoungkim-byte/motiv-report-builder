@@ -17,8 +17,9 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from ai import NARRATIVE_SECTIONS, generate_hero_image, generate_narrative
+from ai import NARRATIVE_SECTIONS, generate_hero_image, generate_narrative, plan_charts
 from ai.narrative import INSIGHTS_KEY, INSIGHTS_LABEL
+from viz import render_chart, TEMPLATE_NAMES
 from auth import logout, require_auth
 from config import load_settings
 from data import CampaignData, CampaignRepository, MetricRow, load_build, save_build
@@ -417,11 +418,31 @@ with col_r:
             if str(r.get("indicator", "")).strip() and str(r.get("value", "")).strip()
         ]
 
+        # Chart planning + rendering. Failures degrade silently — the
+        # template falls back to the metrics table when chart_set is empty.
+        chart_set: list[dict] = []
+        try:
+            with st.spinner("차트 큐레이션 중 (Claude)..."):
+                planned = plan_charts(
+                    campaign.to_prompt_dict(),
+                    st.session_state.narrative,
+                    campaign_context_prose=st.session_state.context_prose,
+                )
+            for spec in planned:
+                try:
+                    img_b64 = render_chart(spec["template"], spec["data"])
+                    chart_set.append({**spec, "image_b64": img_b64})
+                except Exception as e:
+                    st.warning(f"차트 '{spec.get('title')}' 렌더 실패: {e}")
+        except Exception as e:
+            st.warning(f"차트 큐레이션 단계 실패 (테이블로 폴백): {e}")
+
         context = {
             "headline": st.session_state.headline,
             "subhead": st.session_state.subhead,
             "campaign": asdict(campaign),
             "narrative": st.session_state.narrative,
+            "chart_set": chart_set,
             "hero_image_url": Path(st.session_state.hero_path).as_uri()
             if st.session_state.hero_path
             else None,
