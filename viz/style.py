@@ -29,27 +29,83 @@ SERIES_COLORS = [OLIVE, GOLD, OLIVE_LIGHT, "#8b7d5a", "#3d4a23", "#6b6f63"]
 
 
 # ── Font discovery ──────────────────────────────────────────────────
-# Linux container: fonts-noto-cjk → "Noto Sans CJK KR"
+# Linux container: fonts-noto-cjk → "Noto Sans CJK KR" (.ttc collection
+#   at /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc — some
+#   freetype builds bundled with matplotlib reject .ttc, raising
+#   "Can not load face; error code 0x2".)
 # Windows local:   Malgun Gothic
 # Mac local:       Apple SD Gothic Neo
 _FONT_CANDIDATES = [
-    "Noto Sans CJK KR",
-    "Noto Sans KR",
+    # fonts-nanum 가 순수 TTF 라 freetype 에서 가장 안정적
+    "NanumGothic",
+    "NanumBarunGothic",
+    # 로컬 OS 폰트 (Win/Mac)
     "Malgun Gothic",
     "Apple SD Gothic Neo",
     "Pretendard",
+    # Noto CJK 는 .ttc 라 freetype 빌드에 따라 거부될 수 있음 — 후순위
+    "Noto Sans CJK KR",
+    "Noto Sans KR",
     "DejaVu Sans",
 ]
 
 
-def _available_font() -> str:
-    """Pick the first installed Korean-capable font on this box."""
-    from matplotlib.font_manager import findSystemFonts, FontProperties
-    installed = {FontProperties(fname=f).get_name() for f in findSystemFonts()}
-    for f in _FONT_CANDIDATES:
-        if f in installed:
-            return f
-    return "DejaVu Sans"
+# Known Korean font paths to register directly. Streamlit Cloud (Debian)
+# may have these installed but not yet in matplotlib's cached font list
+# if the cache was built before the apt install. addfont() bypasses the
+# cache lookup entirely.
+_DIRECT_FONT_PATHS = [
+    "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+    "/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf",
+    "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
+]
+
+
+def _register_direct_fonts() -> None:
+    try:
+        import os
+        from matplotlib import font_manager as fm
+    except Exception:
+        return
+    for p in _DIRECT_FONT_PATHS:
+        if os.path.isfile(p):
+            try:
+                fm.fontManager.addfont(p)
+            except Exception:
+                continue
+
+
+def _available_fonts() -> list[str]:
+    """Return Korean-capable fonts present on this box, in priority order.
+
+    Defensive: any single font file that freetype refuses (corrupt, .ttc
+    edge cases, non-font sneaking into the font dirs) is skipped instead
+    of nuking the entire discovery. Worst case we return ['DejaVu Sans']
+    and Korean glyphs render as tofu boxes, but the chart still draws —
+    much better than crashing the build."""
+    _register_direct_fonts()
+    try:
+        from matplotlib.font_manager import findSystemFonts, FontProperties, fontManager
+    except Exception:
+        return ["DejaVu Sans"]
+    installed: set[str] = set()
+    # Names already loaded into the font manager (covers addfont() above)
+    try:
+        installed.update(f.name for f in fontManager.ttflist)
+    except Exception:
+        pass
+    # Also walk system fonts defensively
+    for f in findSystemFonts():
+        try:
+            installed.add(FontProperties(fname=f).get_name())
+        except Exception:
+            continue
+    picked = [f for f in _FONT_CANDIDATES if f in installed]
+    if not picked:
+        picked = ["DejaVu Sans"]
+    elif "DejaVu Sans" not in picked:
+        picked.append("DejaVu Sans")  # last-resort fallback for the chain
+    return picked
 
 
 _STYLE_APPLIED = False
@@ -60,9 +116,10 @@ def apply_style() -> None:
     global _STYLE_APPLIED
     if _STYLE_APPLIED:
         return
-    font = _available_font()
+    font_chain = _available_fonts()
     rcParams.update({
-        "font.family": font,
+        "font.family": "sans-serif",
+        "font.sans-serif": font_chain,
         "font.size": 9,
         "axes.titlesize": 10,
         "axes.titleweight": "bold",

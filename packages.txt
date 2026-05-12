@@ -17,3 +17,4 @@ libasound2
 fonts-noto-cjk
 fonts-noto-cjk-extra
 fonts-noto-color-emoji
+fonts-nanum
