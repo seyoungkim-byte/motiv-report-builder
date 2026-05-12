@@ -8,115 +8,120 @@
 <body>
 <section class="page">
 
-  <header class="p-top">
-    <div class="p-top__text">
-      <p class="p-eyebrow">{{ company.name }} Official Case Study</p>
-      <h1>{{ headline }}</h1>
-      {% if subhead %}<p class="p-subhead">{{ subhead }}</p>{% endif %}
-      <hr class="p-rule">
-    </div>
-    {% if hero_image_url %}
-    <div class="p-top__hero"><img src="{{ hero_image_url }}" alt=""></div>
-    {% endif %}
+  {# ── 헤더 띠 (Securities Note 톤) ───────────────────────── #}
+  <header class="hdr">
+    <span class="hdr__brand">{{ company.name }}</span>
+    <span class="hdr__divider">▌</span>
+    <span class="hdr__type">Case Study Note</span>
+    <span class="hdr__meta">
+      {% if campaign.campaign_no %}No. {{ campaign.campaign_no }} · {% endif %}
+      {% if campaign.period_start %}{{ campaign.period_start }}{% if campaign.period_end %} – {{ campaign.period_end }}{% endif %}{% endif %}
+    </span>
   </header>
 
+  {# ── 타이틀 + TL;DR ───────────────────────────────────── #}
+  <section class="title-block">
+    <h1 class="title-block__h1">{{ headline }}</h1>
+    {% if subhead %}<p class="title-block__sub">{{ subhead }}</p>{% endif %}
+    {% if narrative.tldr %}
+    <ul class="tldr">
+      {% for item in narrative.tldr %}
+      <li>{{ item }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </section>
+
+  {# ── KPI 스트립 ────────────────────────────────────────── #}
   {% if campaign.metrics_table %}
-  <section class="p-stats">
+  <section class="kpis">
     {% for m in campaign.metrics_table[:4] %}
-    <div class="p-stat">
-      <span class="p-stat__label">{{ m.indicator }}</span>
-      <span class="p-stat__value">{{ m.value }}</span>
-      {% if m.note %}<span class="p-stat__note">{{ m.note }}</span>{% endif %}
+    <div class="kpi">
+      <span class="kpi__label">{{ m.indicator }}</span>
+      <span class="kpi__value">{{ m.value }}</span>
+      {% if m.note %}<span class="kpi__note">{{ m.note }}</span>{% endif %}
     </div>
     {% endfor %}
   </section>
   {% endif %}
 
-  <div class="p-grid">
-    <div class="p-col p-col--left">
-      {% if narrative.summary %}
-      <section class="p-summary">
-        <h2>요약</h2>
-        <p>{{ narrative.summary }}</p>
-      </section>
-      {% endif %}
+  {# ── 본문 — 1단 세로 흐름 ─────────────────────────────── #}
+  <section class="body">
 
-      <h2><span class="p-h2__icon">📌</span>01. 캠페인 개요</h2>
-      <p>{{ narrative.overview }}</p>
-
-      <h2><span class="p-h2__icon">🎯</span>02. 광고 집행 배경</h2>
-      <p>{{ narrative.background }}</p>
-
-      <h2><span class="p-h2__icon">💡</span>03. 적용 전략</h2>
-      {% if charts.inline_strategy %}
-      <div class="p-inline-row">
-        <p class="p-inline-row__text">{{ narrative.strategy }}</p>
-        <figure class="p-inline-chart">
-          <img src="data:image/png;base64,{{ charts.inline_strategy.image_b64 }}" alt="{{ charts.inline_strategy.title }}">
-          {% if charts.inline_strategy.caption %}
-          <figcaption>{{ charts.inline_strategy.caption }}</figcaption>
-          {% endif %}
-        </figure>
-      </div>
-      {% else %}
-      <p>{{ narrative.strategy }}</p>
-      {% endif %}
+    {% if narrative.summary %}
+    <div class="summary">
+      <h3>요약</h3>
+      <p>{{ narrative.summary }}</p>
     </div>
+    {% endif %}
 
-    <div class="p-col p-col--right">
-      <h2><span class="p-h2__icon">📊</span>04. 캠페인 성과</h2>
-      {% if charts.performance %}
-      <div class="p-perf">
-        {% for ch in charts.performance %}
-        <figure class="p-perf-chart">
-          <img src="data:image/png;base64,{{ ch.image_b64 }}" alt="{{ ch.title }}">
-          {% if ch.caption %}
-          <figcaption>{{ ch.caption }}</figcaption>
-          {% endif %}
-        </figure>
+    <h2><span class="sec-num">01</span>캠페인 개요</h2>
+    <p>{{ narrative.overview }}</p>
+
+    <h2><span class="sec-num">02</span>광고 집행 배경</h2>
+    <p>{{ narrative.background }}</p>
+
+    <h2><span class="sec-num">03</span>적용 전략 · 핵심 성과</h2>
+    <p>{{ narrative.strategy }}</p>
+
+    {# 차트 — [그림 N] 라벨링, 본문 흐름 안에서 직접 노출 #}
+    {% set all_charts = (charts.performance or []) + ([charts.inline_strategy] if charts.inline_strategy else []) %}
+    {% if all_charts %}
+    <div class="figs">
+      {% for ch in all_charts %}
+      <figure class="fig">
+        <div class="fig__head">
+          <span class="fig__num">[그림 {{ loop.index }}]</span>
+          <span class="fig__title">{{ ch.title }}</span>
+        </div>
+        <img src="data:image/png;base64,{{ ch.image_b64 }}" alt="{{ ch.title }}">
+        {% if ch.caption %}<figcaption>{{ ch.caption }}</figcaption>{% endif %}
+      </figure>
+      {% endfor %}
+    </div>
+    {% elif campaign.metrics_table %}
+    <table class="metrics">
+      <thead>
+        <tr><th>성과 지표</th><th>성과</th><th>비고</th></tr>
+      </thead>
+      <tbody>
+        {% for m in campaign.metrics_table %}
+        <tr>
+          <td class="metrics__indicator">{{ m.indicator }}</td>
+          <td class="metrics__value">{{ m.value }}</td>
+          <td class="metrics__note">{{ m.note }}</td>
+        </tr>
         {% endfor %}
-      </div>
-      {% elif campaign.metrics_table %}
-      <table class="p-metrics">
-        <thead>
-          <tr><th>성과 지표</th><th>성과</th><th>비고</th></tr>
-        </thead>
-        <tbody>
-          {% for m in campaign.metrics_table %}
-          <tr>
-            <td class="p-metrics__indicator">{{ m.indicator }}</td>
-            <td class="p-metrics__value">{{ m.value }}</td>
-            <td class="p-metrics__note">{{ m.note }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      {% endif %}
+      </tbody>
+    </table>
+    {% endif %}
 
-      {% if narrative.insights %}
-      <h2><span class="p-h2__icon">✨</span>05. 인사이트</h2>
-      <ul class="p-insights">
+    {# ── 핵심 인사이트 callout ─────────────────────────── #}
+    {% if narrative.insights %}
+    <div class="insights-box">
+      <h3>핵심 인사이트</h3>
+      <ul>
         {% for item in narrative.insights %}
         <li>{{ item }}</li>
         {% endfor %}
       </ul>
-      {% endif %}
-
-      <aside class="p-about">
-        <h3>About {{ company.name }}</h3>
-        <p>{{ company.description }}</p>
-      </aside>
     </div>
-  </div>
+    {% endif %}
+  </section>
 
-  <footer class="p-footer">
-    <span class="p-footer__brand">{{ company.name }}</span>
-    <span class="p-footer__links">
-      Website: {{ company.url }}{% if company.url_secondary %}, {{ company.url_secondary }}{% endif %}
-      &nbsp;|&nbsp; Contact Us: {{ company.press_contact_email }}
-    </span>
-    <span class="p-footer__copy">© {{ year }} {{ company.name }} Inc. All Rights Reserved.</span>
+  {# ── About + Footer 띠 ──────────────────────────────── #}
+  <footer class="ftr">
+    <div class="ftr__about">
+      <strong>About {{ company.name }}</strong>
+      <span>{{ company.description }}</span>
+    </div>
+    <div class="ftr__meta">
+      <span>{{ company.url }}{% if company.url_secondary %} · {{ company.url_secondary }}{% endif %}</span>
+      <span>{{ company.press_contact_email }}</span>
+      <span>© {{ year }} {{ company.name }} Inc.</span>
+    </div>
   </footer>
+
 </section>
 </body>
 </html>

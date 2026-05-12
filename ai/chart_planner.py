@@ -50,8 +50,11 @@ SYSTEM_PROMPT = """당신은 데이터 시각화 큐레이터입니다.
 5. 한국어 라벨, 경어체 캡션.
 
 [배치]
-- "performance" : 우측 컬럼의 04 영역. 최대 2개. 캠페인 대표 성과 차트.
-- "inline_strategy" : 03(적용 전략) 텍스트 옆 작은 차트. 최대 1개. 전략 근거 시각화 (예: 타겟 세그먼트 분포).
+세로 1단 레이아웃에서 차트는 본문 흐름 안에 [그림 1], [그림 2] 형태로 배치됩니다.
+- "performance"      : 메인 성과 차트 (이번 캠페인의 핵심 숫자 1~2개 시각화). 최대 2개.
+- "inline_strategy"  : 전략 근거 시각화 (타겟/세그먼트 등). 최대 1개. 보통 생략 가능.
+
+총 0~2개 권장 (3개는 1페이지 압박). 데이터가 정말 충분히 다른 각도일 때만 2개.
 
 [템플릿]
 - bar_horizontal     : 카테고리별 값 비교 (전환률·CTR·VTR 등). 승자 1개 강조. 4~6 항목 권장.
@@ -100,7 +103,7 @@ charts: list. 각 항목:
 
 [제약]
 - performance ≤ 2, inline_strategy ≤ 1.
-- 차트 총 0~3개.
+- 차트 총 0~2개 (3개는 1페이지에 안 들어감).
 - 데이터가 부족하면 빈 리스트 반환: {"charts": []}.
 - 코드펜스·설명·머리말 금지. JSON 만.
 """
@@ -270,8 +273,8 @@ def _validate(items: list[Any]) -> list[dict[str, Any]]:
             "caption":  str(item.get("caption") or ""),
             "data":     data,
         })
-        if len(out) >= 3:
-            break
+        if len(out) >= 2:
+            break       # hard cap — 1-col layout can't fit a 3rd chart
     return out
 
 

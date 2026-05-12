@@ -1,180 +1,302 @@
-/* Print (PDF) — A4 single-page, mirrors the reference layout. */
+/* Print (PDF) — A4 single-page, securities-note tone.
+   - 1-column vertical flow (textual, like 한투증권/KB 지식비타민)
+   - "[그림 N]" labeled charts inline with the relevant paragraph
+   - Olive primary + gold accent + ink for headings
+*/
 @page { size: A4; margin: 0; }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
-  /* CJK + Emoji fallback chain.
-       Korean: Malgun(Win) → Apple SD(Mac) → Noto CJK(Linux) → Pretendard
-       Emoji: Noto Color Emoji (Linux container 에 apt 로 설치)
-     Chromium 은 한 글자가 위 family 로 못 그려지면 emoji family 로 폴백. */
-  font: 9.5pt/1.5 "Malgun Gothic", "Pretendard", "Apple SD Gothic Neo",
-                  "Noto Sans CJK KR", "Noto Sans KR", "Noto Sans",
-                  "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji",
-                  sans-serif;
+  font: 9.5pt/1.55 "Malgun Gothic", "Pretendard", "Apple SD Gothic Neo",
+                   "Noto Sans CJK KR", "Noto Sans KR", "Noto Sans",
+                   "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji",
+                   sans-serif;
   color: #1d1f1a;
   background: #ffffff;
 }
 .page {
   width: 210mm;
   height: 297mm;
-  padding: 9mm 11mm 7mm;
+  padding: 11mm 13mm 8mm;
   display: flex;
   flex-direction: column;
-  overflow: hidden;                 /* hard 1-page guarantee */
+  gap: 4mm;
+  overflow: hidden;     /* hard 1-page guarantee */
 }
 
-/* ── Top band */
-.p-top {
+/* ─── Header band ──────────────────────────────────── */
+.hdr {
+  display: flex;
+  align-items: baseline;
+  gap: 2mm;
+  padding-bottom: 1.8mm;
+  border-bottom: 0.4mm solid #1d1f1a;
+  font-size: 8.5pt;
+}
+.hdr__brand   { font-weight: 800; color: #1d1f1a; letter-spacing: .02em; }
+.hdr__divider { color: #7d8c4e; font-weight: 700; }
+.hdr__type    { color: #4e5a2d; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; font-size: 8pt; }
+.hdr__meta    { margin-left: auto; color: #6b6f63; font-size: 7.8pt; }
+
+/* ─── Title block ───────────────────────────────────── */
+.title-block { margin: 0; }
+.title-block__h1 {
+  margin: 0 0 1.5mm;
+  font-size: 19pt;
+  line-height: 1.18;
+  font-weight: 800;
+  color: #1d1f1a;
+  letter-spacing: -0.01em;
+}
+.title-block__sub {
+  margin: 0 0 2mm;
+  font-size: 10.5pt;
+  color: #4e5a2d;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.tldr {
+  margin: 1.5mm 0 0;
+  padding: 0;
+  list-style: none;
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  gap: 6mm;
-  background: #f5efe4;
-  padding: 6mm 7mm;
-  border-radius: 2.5mm;
-  margin-bottom: 4mm;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2mm;
 }
-.p-top__hero img { width: 100%; height: 46mm; object-fit: cover; border-radius: 2mm; }
-.p-eyebrow { margin: 0 0 1.5mm; color: #7d8c4e; font-size: 8pt; font-weight: 700; letter-spacing: .04em; }
-.p-top h1 { margin: 0 0 1.5mm; font-size: 18pt; line-height: 1.18; font-weight: 800; }
-.p-subhead { margin: 0 0 2mm; color: #6b6f63; font-size: 9.5pt; }
-.p-rule { border: 0; border-top: .5mm solid #7d8c4e; margin: 0; width: 14mm; }
+.tldr li {
+  position: relative;
+  padding: 1.6mm 2mm 1.6mm 4.2mm;
+  background: #f5efe4;
+  border-left: 0.7mm solid #7d8c4e;
+  font-size: 7.8pt;          /* 8.4→7.8 — fit 30~45자 칩 한 줄에 */
+  line-height: 1.3;
+  color: #2c2e26;
+  word-break: keep-all;      /* CJK 자연 줄바꿈 */
+}
+.tldr li::before {
+  content: "▸";
+  position: absolute;
+  left: 1.5mm;
+  color: #7d8c4e;
+  font-size: 8pt;
+}
 
-/* ── Hero stat strip */
-.p-stats {
+/* ─── KPI strip ─────────────────────────────────────── */
+.kpis {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 2mm;
-  margin-bottom: 4mm;
+  gap: 2.5mm;
+  margin: 0;
 }
-.p-stat {
-  background: #f5efe4;
-  border-top: 0.5mm solid #7d8c4e;
-  border-radius: 1.5mm;
-  padding: 2.2mm 2.5mm;
+.kpi {
+  background: #ffffff;
+  border: 0.3mm solid #dfd9ca;
+  border-top: 0.8mm solid #7d8c4e;
+  border-radius: 1mm;
+  padding: 2.5mm 3mm 2.5mm;
   display: flex;
   flex-direction: column;
   gap: 0.6mm;
 }
-.p-stat__label { font-size: 7pt; color: #6b6f63; }
-.p-stat__value { font-size: 12pt; font-weight: 800; color: #4e5a2d; line-height: 1.15; }
-.p-stat__note  { font-size: 6.8pt; color: #6b6f63; line-height: 1.3; }
-
-/* ── Two-column body */
-.p-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 7mm;
-  flex: 1;
+.kpi__label { font-size: 7.5pt; color: #6b6f63; font-weight: 500; letter-spacing: .01em; }
+.kpi__value {
+  font-size: 16pt;
+  font-weight: 800;
+  color: #1d1f1a;
+  line-height: 1.1;
+  margin-top: 0.5mm;
 }
-.p-col h2, .p-col > h2 { font-size: 10.5pt; margin: 0 0 1.5mm; color: #4e5a2d; font-weight: 700; display: inline-flex; align-items: baseline; gap: 1.5mm; }
-.p-h2__icon { font-size: 9pt; }
-.p-col p { margin: 0 0 3mm; font-size: 9pt; line-height: 1.5; }
-.p-summary {
+.kpi__note  { font-size: 7pt; color: #7d8c4e; font-weight: 600; line-height: 1.25; }
+
+/* ─── Body ──────────────────────────────────────────── */
+.body { margin: 0; flex: 1; }
+.body h2 {
+  margin: 4mm 0 1.5mm;
+  font-size: 11pt;
+  font-weight: 800;
+  color: #1d1f1a;
+  display: flex;
+  align-items: baseline;
+  gap: 2mm;
+}
+.body h2:first-child { margin-top: 0; }
+.body h2 .sec-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 6mm;
+  height: 4.4mm;
+  padding: 0 1.5mm;
+  background: #4e5a2d;
+  color: #ffffff;
+  font-size: 7.8pt;
+  font-weight: 800;
+  border-radius: 0.6mm;
+  letter-spacing: .02em;
+}
+.body p {
+  margin: 0 0 2.5mm;
+  font-size: 9pt;
+  line-height: 1.55;
+  color: #2c2e26;
+}
+
+/* ─── Summary callout ───────────────────────────────── */
+.summary {
   background: #f5efe4;
   border-left: 1mm solid #7d8c4e;
   padding: 2.5mm 3mm;
-  border-radius: 1.5mm;
-  margin-bottom: 3mm;
+  border-radius: 0 1mm 1mm 0;
+  margin: 0 0 1mm;
 }
-.p-summary h2 { margin: 0 0 1mm; font-size: 10pt; color: #4e5a2d; }
-.p-summary p { margin: 0; font-size: 8.8pt; line-height: 1.45; }
+.summary h3 { margin: 0 0 1mm; font-size: 9pt; color: #4e5a2d; font-weight: 800; letter-spacing: .02em; }
+.summary p  { margin: 0; font-size: 8.8pt; line-height: 1.5; color: #1d1f1a; }
 
-/* ── Results table */
-.p-metrics { width: 100%; border-collapse: collapse; font-size: 8.2pt; margin-bottom: 3mm; }
-.p-metrics thead th {
-  background: #7d8c4e;
-  color: #fff;
+/* ─── Charts inline with paragraphs ─────────────────── */
+.figs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3mm;
+  margin: 1.5mm 0 2.5mm;
+}
+.figs:has(> .fig:only-child) {
+  /* single chart spans full width when only one */
+  grid-template-columns: 1fr;
+}
+.fig {
+  margin: 0;
+  background: #ffffff;
+  border: 0.3mm solid #dfd9ca;
+  border-radius: 1mm;
+  padding: 2mm 2.5mm 2.5mm;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+.fig__head {
+  display: flex;
+  align-items: baseline;
+  gap: 1.8mm;
+  margin-bottom: 1.2mm;
+  padding-bottom: 1mm;
+  border-bottom: 0.2mm solid #f0ebe0;
+}
+.fig__num {
+  font-size: 7.5pt;
+  font-weight: 800;
+  color: #c9a961;
+  letter-spacing: .02em;
+}
+.fig__title {
+  font-size: 8.8pt;
+  font-weight: 700;
+  color: #1d1f1a;
+}
+.fig img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 42mm;
+  object-fit: contain;
+}
+.fig figcaption {
+  margin-top: 1mm;
+  font-size: 7.5pt;
+  color: #4e5a2d;
+  font-weight: 500;
+  line-height: 1.35;
+  padding-left: 2mm;
+  border-left: 0.4mm solid #c9a961;
+}
+
+/* ─── Metrics table (fallback) ──────────────────────── */
+.metrics { width: 100%; border-collapse: collapse; font-size: 8.4pt; margin: 1mm 0 2.5mm; }
+.metrics thead th {
+  background: #1d1f1a;
+  color: #ffffff;
   font-weight: 600;
   text-align: left;
   padding: 1.5mm 2mm;
+  font-size: 7.8pt;
+  letter-spacing: .03em;
+  text-transform: uppercase;
 }
-.p-metrics tbody td { border-bottom: .2mm solid #dfd9ca; padding: 1.2mm 2mm; vertical-align: top; }
-.p-metrics__indicator { font-weight: 500; }
-.p-metrics__value { color: #4e5a2d; font-weight: 700; white-space: nowrap; }
-.p-metrics__note { color: #6b6f63; font-size: 7.8pt; }
+.metrics tbody td { border-bottom: .2mm solid #e5dfd0; padding: 1.3mm 2mm; vertical-align: top; }
+.metrics__indicator { font-weight: 500; color: #1d1f1a; }
+.metrics__value     { color: #4e5a2d; font-weight: 800; white-space: nowrap; }
+.metrics__note      { color: #6b6f63; font-size: 8pt; }
 
-/* ── Charts — performance zone (replaces 04 table when AI picks charts) */
-.p-perf { display: flex; flex-direction: column; gap: 2.5mm; margin-bottom: 2.5mm; }
-.p-perf-chart {
-  margin: 0;
-  background: #f5efe4;            /* ivory — matches summary/about/stats */
-  border-top: 0.5mm solid #7d8c4e;
-  border-radius: 1.5mm;
-  padding: 1.8mm 2.5mm 2.2mm;
-}
-.p-perf-chart img {
-  display: block;
-  width: 100%;
-  height: auto;
-  max-height: 36mm;               /* 48→36 — keep page on 1p when 2 charts */
-  object-fit: contain;
-}
-.p-perf-chart figcaption {
-  margin: 1.2mm 0 0;
-  font-size: 7.5pt;
-  font-weight: 500;
-  color: #4e5a2d;
-  line-height: 1.35;
-}
-
-/* ── Inline chart row (next to 03 strategy text) */
-.p-inline-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
-  gap: 3mm;
-  align-items: start;
-  margin-bottom: 3mm;
-}
-.p-inline-row__text { margin: 0; font-size: 9pt; line-height: 1.5; }
-.p-inline-chart {
-  margin: 0;
-  background: #f5efe4;
-  border-top: 0.5mm solid #7d8c4e;
-  padding: 1.5mm 2mm;
+/* ─── Insights callout box ──────────────────────────── */
+.insights-box {
+  background: #fdfbf4;
+  border: 0.3mm solid #e8dfc4;
+  border-top: 1mm solid #c9a961;
   border-radius: 1mm;
-}
-.p-inline-chart img {
-  display: block;
-  width: 100%;
-  height: auto;
-  max-height: 34mm;
-  object-fit: contain;
-}
-.p-inline-chart figcaption {
-  margin: 0.8mm 0 0;
-  font-size: 7pt;
-  font-weight: 500;
-  color: #4e5a2d;
-  line-height: 1.3;
-}
-
-/* ── Insights */
-.p-insights { padding-left: 3.5mm; margin: 0 0 2.5mm; }
-.p-insights li { margin-bottom: 1mm; font-size: 8.4pt; line-height: 1.4; }
-.p-insights li::marker { color: #7d8c4e; }
-
-/* ── About */
-.p-about {
-  background: #f5efe4;
-  border-radius: 2mm;
-  padding: 2mm 2.5mm;
-  margin-top: 1.5mm;
-  page-break-inside: avoid;        /* never split across pages */
+  padding: 2.8mm 3.5mm 2.5mm;
+  margin: 1.5mm 0 0;
+  page-break-inside: avoid;
   break-inside: avoid;
 }
-.p-about h3 { margin: 0 0 0.8mm; font-size: 8.5pt; color: #4e5a2d; }
-.p-about p { margin: 0; font-size: 7.8pt; line-height: 1.4; }
+.insights-box h3 {
+  margin: 0 0 1.5mm;
+  font-size: 9.5pt;
+  font-weight: 800;
+  color: #4e5a2d;
+  letter-spacing: .01em;
+  display: flex;
+  align-items: center;
+  gap: 1.5mm;
+}
+.insights-box h3::before {
+  content: "▌";
+  color: #c9a961;
+  font-size: 10pt;
+  margin-right: -0.5mm;
+}
+.insights-box ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.insights-box li {
+  position: relative;
+  padding: 0 0 1mm 4.5mm;
+  font-size: 8.6pt;
+  line-height: 1.45;
+  color: #1d1f1a;
+}
+.insights-box li::before {
+  content: "○";
+  position: absolute;
+  left: 1mm;
+  top: 0;
+  color: #7d8c4e;
+  font-weight: 700;
+  font-size: 9pt;
+}
+.insights-box li:last-child { padding-bottom: 0; }
 
-/* ── Footer */
-.p-footer {
-  border-top: .3mm solid #dfd9ca;
-  padding-top: 1.5mm;
-  margin-top: 2mm;
+/* ─── Footer ────────────────────────────────────────── */
+.ftr {
+  margin-top: auto;
+  padding-top: 2mm;
+  border-top: 0.4mm solid #1d1f1a;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5mm;
+}
+.ftr__about {
+  font-size: 7.5pt;
+  color: #2c2e26;
+  line-height: 1.4;
+}
+.ftr__about strong { color: #4e5a2d; font-weight: 800; margin-right: 2mm; }
+.ftr__meta {
   display: flex;
   justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 2mm;
-  font-size: 7.5pt;
+  gap: 3mm;
+  font-size: 7pt;
   color: #6b6f63;
+  border-top: 0.15mm solid #e5dfd0;
+  padding-top: 1.2mm;
 }
-.p-footer__brand { font-weight: 700; color: #4e5a2d; }
+.ftr__meta span:first-child { color: #4e5a2d; }

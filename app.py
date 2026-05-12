@@ -18,7 +18,7 @@ import pandas as pd
 import streamlit as st
 
 from ai import NARRATIVE_SECTIONS, generate_hero_image, generate_narrative, plan_charts
-from ai.narrative import INSIGHTS_KEY, INSIGHTS_LABEL
+from ai.narrative import INSIGHTS_KEY, INSIGHTS_LABEL, TLDR_KEY, TLDR_LABEL
 from viz import render_chart, TEMPLATE_NAMES
 from auth import logout, require_auth
 from config import load_settings
@@ -106,7 +106,10 @@ def _session_default(key, value):
 
 
 _session_default("campaign", None)
-_session_default("narrative", {k: "" for k, _ in NARRATIVE_SECTIONS} | {INSIGHTS_KEY: []})
+_session_default(
+    "narrative",
+    {k: "" for k, _ in NARRATIVE_SECTIONS} | {INSIGHTS_KEY: [], TLDR_KEY: []},
+)
 _session_default("metrics_df", None)
 _session_default("hero_path", None)
 _session_default("headline", "")
@@ -122,10 +125,13 @@ def _reset_campaign_state(data: CampaignData):
     st.session_state.metrics_df = pd.DataFrame(
         [{"indicator": m.indicator, "value": m.value, "note": m.note} for m in data.metrics_table]
     )
-    st.session_state.narrative = {k: "" for k, _ in NARRATIVE_SECTIONS} | {INSIGHTS_KEY: []}
+    st.session_state.narrative = (
+        {k: "" for k, _ in NARRATIVE_SECTIONS} | {INSIGHTS_KEY: [], TLDR_KEY: []}
+    )
     for k, _ in NARRATIVE_SECTIONS:
         st.session_state[f"nar_{k}"] = ""
     st.session_state["nar_insights"] = ""
+    st.session_state["nar_tldr"] = ""
     st.session_state.context_prose = ""
     st.session_state.headline = ""
     st.session_state.subhead = ""
@@ -145,10 +151,14 @@ def _reset_campaign_state(data: CampaignData):
     st.session_state.context_prose = src.get("context_prose") or ""
     nar = src.get("narrative") or {}
     if nar:
+        # Backfill missing keys so older builds don't blow up the widgets
+        nar.setdefault(TLDR_KEY, [])
+        nar.setdefault(INSIGHTS_KEY, [])
         st.session_state.narrative = nar
         for k, _ in NARRATIVE_SECTIONS:
             st.session_state[f"nar_{k}"] = nar.get(k, "")
         st.session_state["nar_insights"] = "\n".join(nar.get(INSIGHTS_KEY, []))
+        st.session_state["nar_tldr"] = "\n".join(nar.get(TLDR_KEY, []))
 
     saved_metrics = src.get("metrics_table") or []
     if saved_metrics:
@@ -289,6 +299,9 @@ with col_l:
                 st.session_state["nar_insights"] = "\n".join(
                     result.get(INSIGHTS_KEY, [])
                 )
+                st.session_state["nar_tldr"] = "\n".join(
+                    result.get(TLDR_KEY, [])
+                )
                 st.success("초안 생성 완료. 아래에서 수정하세요.")
             except Exception as e:
                 st.error(f"생성 실패: {e}")
@@ -306,6 +319,22 @@ with col_l:
         st.session_state["nar_insights"] = "\n".join(
             st.session_state.narrative.get(INSIGHTS_KEY, [])
         )
+    if "nar_tldr" not in st.session_state:
+        st.session_state["nar_tldr"] = "\n".join(
+            st.session_state.narrative.get(TLDR_KEY, [])
+        )
+
+    # TL;DR sits at the top — it's the eyebrow line under the headline,
+    # shown as three side-by-side chips in print/web.
+    st.text_area(
+        TLDR_LABEL + " — 한 줄에 한 항목, 30~45자 단문 3개",
+        height=90,
+        key="nar_tldr",
+        help="헤더 옆 3분할 박스에 들어갑니다. 핵심 사실 1개씩.",
+    )
+    st.session_state.narrative[TLDR_KEY] = [
+        line.strip() for line in st.session_state["nar_tldr"].splitlines() if line.strip()
+    ][:3]
 
     for key, label in NARRATIVE_SECTIONS:
         st.text_area(label, height=120, key=f"nar_{key}")
