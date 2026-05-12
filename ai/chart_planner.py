@@ -120,6 +120,7 @@ def plan_charts(
     narrative: dict[str, Any],
     *,
     campaign_context_prose: str = "",
+    debug: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Ask Claude to pick 0~3 charts. Returns list of validated specs.
 
@@ -128,6 +129,12 @@ def plan_charts(
 
     Invalid items (unknown template, malformed data) are filtered out
     silently — the build still succeeds with whatever survives.
+
+    `debug` (optional): caller can pass an empty dict; we populate it with
+      reason  (str) — "api_error" / "no_text" / "json_error" / "validated"
+      detail (str) — error message or short summary
+      raw    (str) — first 600 chars of Claude's text response when present
+      picked (int) — number of items returned by Claude before validation
     """
     settings = load_settings()
 
@@ -167,24 +174,39 @@ def plan_charts(
             ],
             messages=[{"role": "user", "content": [{"type": "text", "text": user_text}]}],
         )
-    except Exception:
-        # Network/auth/quota — better to ship without charts than to fail
-        # the whole build. The caller checks the empty list.
+    except Exception as e:
+        if debug is not None:
+            debug.update(reason="api_error", detail=f"{type(e).__name__}: {e}", picked=0)
         return []
 
     text = next((b.text for b in response.content if b.type == "text"), "")
+    if debug is not None:
+        debug["raw"] = (text or "")[:600]
     if not text:
+        if debug is not None:
+            debug.update(
+                reason="no_text",
+                detail=f"stop_reason={response.stop_reason!r} types={[b.type for b in response.content]}",
+                picked=0,
+            )
         return []
     try:
         data = json.loads(text)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        if debug is not None:
+            debug.update(reason="json_error", detail=str(e), picked=0)
         return []
 
     raw = data.get("charts") or []
     if not isinstance(raw, list):
+        if debug is not None:
+            debug.update(reason="charts_not_list", detail=f"got {type(raw).__name__}", picked=0)
         return []
 
-    return _validate(raw)
+    validated = _validate(raw)
+    if debug is not None:
+        debug.update(reason="validated", detail=f"claude={len(raw)} validated={len(validated)}", picked=len(raw))
+    return validated
 
 
 def _validate(items: list[Any]) -> list[dict[str, Any]]:

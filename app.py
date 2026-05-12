@@ -418,15 +418,19 @@ with col_r:
             if str(r.get("indicator", "")).strip() and str(r.get("value", "")).strip()
         ]
 
-        # Chart planning + rendering. Failures degrade silently — the
-        # template falls back to the metrics table when chart_set is empty.
+        # Chart planning + rendering. Failures degrade silently into a
+        # metrics-table fallback, but we surface a status line so the user
+        # can tell *why* charts didn't appear (API error vs. Claude judged
+        # data too thin vs. all picks invalid).
         chart_set: list[dict] = []
+        chart_debug: dict = {}
         try:
             with st.spinner("차트 큐레이션 중 (Claude)..."):
                 planned = plan_charts(
                     campaign.to_prompt_dict(),
                     st.session_state.narrative,
                     campaign_context_prose=st.session_state.context_prose,
+                    debug=chart_debug,
                 )
             for spec in planned:
                 try:
@@ -436,6 +440,27 @@ with col_r:
                     st.warning(f"차트 '{spec.get('title')}' 렌더 실패: {e}")
         except Exception as e:
             st.warning(f"차트 큐레이션 단계 실패 (테이블로 폴백): {e}")
+
+        # Visible status: who/what decided there were no charts.
+        if chart_set:
+            st.success(f"📈 차트 {len(chart_set)}개 생성 → 04 영역에 반영")
+        else:
+            reason = chart_debug.get("reason", "unknown")
+            detail = chart_debug.get("detail", "")
+            label = {
+                "api_error":      "Anthropic API 호출 실패",
+                "no_text":        "Claude 응답에 텍스트 없음",
+                "json_error":     "Claude 응답 JSON 파싱 실패",
+                "charts_not_list":"Claude 응답 스키마 불일치",
+                "validated":      "Claude 가 0개 반환 (데이터 근거 부족 판단)",
+                "unknown":        "사유 미상",
+            }.get(reason, reason)
+            st.info(
+                f"📊 차트 0개 — {label}. 04 영역은 기존 성과 표로 렌더됩니다.\n\n"
+                f"디테일: `{detail}`"
+            )
+            with st.expander("🔍 chart_planner 원응답 (앞 600자)"):
+                st.code(chart_debug.get("raw", "(없음)"))
 
         context = {
             "headline": st.session_state.headline,
