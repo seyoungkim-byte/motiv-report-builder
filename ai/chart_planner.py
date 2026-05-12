@@ -84,35 +84,34 @@ charts: list. 각 항목:
 """
 
 
-# Anthropic json_schema strict mode requires `additionalProperties: false`
-# on every declared `type: "object"` AND requires every property to be in
-# `required`. The chart `data` payload varies by template (labels/values
-# for bar_horizontal vs stages for funnel etc.) so we leave it untyped —
-# the per-template structural contract is enforced by `_data_looks_valid`
-# downstream, not by the JSON schema.
-CHART_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "additionalProperties": False,
-    "properties": {
-        "charts": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "template":  {"type": "string", "enum": TEMPLATE_NAMES},
-                    "placement": {"type": "string", "enum": PLACEMENT_VALUES},
-                    "title":     {"type": "string"},
-                    "subtitle":  {"type": "string"},
-                    "caption":   {"type": "string"},
-                    "data":      {},
-                },
-                "required": ["template", "placement", "title", "subtitle", "caption", "data"],
-            },
-        },
-    },
-    "required": ["charts"],
-}
+# We previously used Anthropic's strict json_schema mode for the chart
+# planner, but it rejects every workaround we needed for the `data`
+# field (which has 6 different shapes — one per chart template):
+#   1) additionalProperties: false → forbids template-specific keys
+#   2) untyped {} → "Empty schema not supported"
+#   3) oneOf with per-template schemas → still requires every leaf to be
+#      strict, blowing up the schema for optional fields
+# Simpler path: drop json_schema, ask Claude for a JSON object via prompt,
+# strip code fences, parse with json.loads, and rely on `_data_looks_valid`
+# to discard malformed entries. Sonnet 4.6 follows the schema in the
+# system prompt reliably without strict mode.
+JSON_RETURN_HINT = (
+    "\n[출력 형식] 다음 형태의 JSON 객체만 반환 (코드펜스·설명 금지):\n"
+    "{ \"charts\": [ { \"template\": ..., \"placement\": ..., \"title\": ..., "
+    "\"subtitle\": \"\", \"caption\": ..., \"data\": { 템플릿별 키 } }, ... ] }"
+)
+
+
+def _strip_codefence(text: str) -> str:
+    """Tolerate `````json … `````, ```` ``` … ``` ````, or bare-JSON returns.
+    Claude is told not to wrap in fences but occasionally does anyway."""
+    s = text.strip()
+    if s.startswith("```"):
+        # drop opening fence (with optional language) and closing fence
+        s = s.split("\n", 1)[1] if "\n" in s else s[3:]
+        if s.endswith("```"):
+            s = s[:-3]
+    return s.strip()
 
 
 @lru_cache(maxsize=1)
@@ -162,6 +161,7 @@ def plan_charts(
     user_text = (
         f"{db_block}\n\n{nar_block}\n\n{prose_block}\n\n"
         "[지시] 위 [원칙]에 따라 0~3개 차트를 선택해 JSON으로 반환하세요."
+        f"{JSON_RETURN_HINT}"
     )
 
     try:
@@ -169,10 +169,6 @@ def plan_charts(
             model=settings.anthropic_text_model,
             max_tokens=2048,
             thinking={"type": "disabled"},
-            output_config={
-                "effort": "medium",
-                "format": {"type": "json_schema", "schema": CHART_SCHEMA},
-            },
             system=[
                 {
                     "type": "text",
@@ -199,7 +195,7 @@ def plan_charts(
             )
         return []
     try:
-        data = json.loads(text)
+        data = json.loads(_strip_codefence(text))
     except json.JSONDecodeError as e:
         if debug is not None:
             debug.update(reason="json_error", detail=str(e), picked=0)
