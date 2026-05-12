@@ -51,15 +51,27 @@ def _fig_to_png_b64(fig) -> str:
 
 
 def _format_value(value: float, fmt: str | None) -> str:
-    """Apply a Python format string, gracefully fall back."""
-    if fmt:
+    """Apply a Python str.format spec, gracefully fall back.
+
+    Claude sometimes returns Excel/Korean format codes like '+#,##0.0%'
+    or '+0.0%' instead of Python's '{:+,.1f}%'. Those strings parse fine
+    via `.format()` but contain no placeholder, so the literal pattern
+    leaks into the chart. We require a real `{` placeholder to trust the
+    template; otherwise fall through to sensible defaults."""
+    if fmt and "{" in fmt and "}" in fmt:
         try:
-            return fmt.format(value)
+            out = fmt.format(value)
+            # double-check: must look different from the template itself,
+            # i.e. the placeholder was actually substituted
+            if out != fmt:
+                return out
         except Exception:
             pass
     if isinstance(value, float):
         if abs(value) >= 1000:
             return f"{value:,.0f}"
+        if abs(value) >= 100:
+            return f"{value:.1f}"
         if abs(value) >= 1:
             return f"{value:.1f}"
         return f"{value:.2f}"
