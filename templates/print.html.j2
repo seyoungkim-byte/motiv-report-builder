@@ -55,14 +55,21 @@
     </div>
     {% endif %}
 
-    <h2><span class="sec-num">01</span>캠페인 개요</h2>
-    <p>{{ narrative.overview }}</p>
+    {# 본문 섹션 — 각각 list[str] 의 불릿 (만연체 X, 한투/KB 톤) #}
+    {% macro section(num, title, items) %}
+      <h2><span class="sec-num">{{ num }}</span>{{ title }}</h2>
+      {% if items is string %}
+        <p>{{ items }}</p>
+      {% elif items %}
+        <ul class="body-bullets">
+          {% for it in items %}<li>{{ it }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+    {% endmacro %}
 
-    <h2><span class="sec-num">02</span>광고 집행 배경</h2>
-    <p>{{ narrative.background }}</p>
-
-    <h2><span class="sec-num">03</span>적용 전략 · 핵심 성과</h2>
-    <p>{{ narrative.strategy }}</p>
+    {{ section('01', '캠페인 개요',           narrative.overview)   }}
+    {{ section('02', '광고 집행 배경',         narrative.background) }}
+    {{ section('03', '적용 전략 · 핵심 성과',  narrative.strategy)   }}
 
     {# 차트 — [그림 N] 라벨링, 본문 흐름 안에서 직접 노출 #}
     {% set all_charts = (charts.performance or []) + ([charts.inline_strategy] if charts.inline_strategy else []) %}

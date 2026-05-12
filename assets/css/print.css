@@ -140,6 +140,28 @@ body {
   line-height: 1.55;
   color: #2c2e26;
 }
+/* Bullet body — 한투/KB 노트 톤. 만연체 대신 단문 ○ 불릿 */
+.body-bullets {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 2.8mm;
+}
+.body-bullets li {
+  position: relative;
+  padding: 0 0 1.2mm 4.5mm;
+  font-size: 8.8pt;
+  line-height: 1.5;
+  color: #2c2e26;
+}
+.body-bullets li::before {
+  content: "▪";
+  position: absolute;
+  left: 1.6mm;
+  top: 0;
+  color: #7d8c4e;
+  font-size: 8.5pt;
+}
+.body-bullets li:last-child { padding-bottom: 0; }
 
 /* ─── Summary callout ───────────────────────────────── */
 .summary {
