@@ -18,7 +18,13 @@ import pandas as pd
 import streamlit as st
 
 from ai import NARRATIVE_SECTIONS, generate_hero_image, generate_narrative, plan_charts
-from ai.narrative import INSIGHTS_KEY, INSIGHTS_LABEL, TLDR_KEY, TLDR_LABEL
+from ai.narrative import (
+    BULLET_SECTIONS,
+    INSIGHTS_KEY,
+    INSIGHTS_LABEL,
+    TLDR_KEY,
+    TLDR_LABEL,
+)
 from viz import render_chart, TEMPLATE_NAMES
 from auth import logout, require_auth
 from config import load_settings
@@ -151,12 +157,19 @@ def _reset_campaign_state(data: CampaignData):
     st.session_state.context_prose = src.get("context_prose") or ""
     nar = src.get("narrative") or {}
     if nar:
-        # Backfill missing keys so older builds don't blow up the widgets
+        # Backfill missing keys so older builds don't blow up the widgets.
+        # Older builds had overview/background/strategy as strings; the new
+        # schema is list[str]. The textarea always wants a string so we
+        # join-on-newline for bullet sections at load time.
         nar.setdefault(TLDR_KEY, [])
         nar.setdefault(INSIGHTS_KEY, [])
         st.session_state.narrative = nar
         for k, _ in NARRATIVE_SECTIONS:
-            st.session_state[f"nar_{k}"] = nar.get(k, "")
+            v = nar.get(k, "")
+            if k in BULLET_SECTIONS and isinstance(v, list):
+                st.session_state[f"nar_{k}"] = "\n".join(v)
+            else:
+                st.session_state[f"nar_{k}"] = v if isinstance(v, str) else ""
         st.session_state["nar_insights"] = "\n".join(nar.get(INSIGHTS_KEY, []))
         st.session_state["nar_tldr"] = "\n".join(nar.get(TLDR_KEY, []))
 
@@ -295,7 +308,11 @@ with col_l:
                 # keeps the stale (empty) value the textarea was first
                 # registered with.
                 for k, _ in NARRATIVE_SECTIONS:
-                    st.session_state[f"nar_{k}"] = result.get(k, "")
+                    val = result.get(k, "")
+                    if k in BULLET_SECTIONS and isinstance(val, list):
+                        st.session_state[f"nar_{k}"] = "\n".join(val)
+                    else:
+                        st.session_state[f"nar_{k}"] = val if isinstance(val, str) else ""
                 st.session_state["nar_insights"] = "\n".join(
                     result.get(INSIGHTS_KEY, [])
                 )
@@ -311,10 +328,15 @@ with col_l:
 
     # Initialize widget keys from the narrative dict on first render only.
     # After init, the widgets own their state — button handler above
-    # overwrites these keys when a new draft is generated.
+    # overwrites these keys when a new draft is generated. Bullet sections
+    # are joined to "one item per line" for the textarea.
     for k, _ in NARRATIVE_SECTIONS:
         if f"nar_{k}" not in st.session_state:
-            st.session_state[f"nar_{k}"] = st.session_state.narrative.get(k, "")
+            val = st.session_state.narrative.get(k, "")
+            if k in BULLET_SECTIONS and isinstance(val, list):
+                st.session_state[f"nar_{k}"] = "\n".join(val)
+            else:
+                st.session_state[f"nar_{k}"] = val if isinstance(val, str) else ""
     if "nar_insights" not in st.session_state:
         st.session_state["nar_insights"] = "\n".join(
             st.session_state.narrative.get(INSIGHTS_KEY, [])
@@ -337,8 +359,21 @@ with col_l:
     ][:3]
 
     for key, label in NARRATIVE_SECTIONS:
-        st.text_area(label, height=120, key=f"nar_{key}")
-        st.session_state.narrative[key] = st.session_state[f"nar_{key}"]
+        if key in BULLET_SECTIONS:
+            st.text_area(
+                f"{label} — 한 줄에 한 불릿 (35~65자 단문)",
+                height=110,
+                key=f"nar_{key}",
+                help="만연체 금지. 단문 사실 1개씩.",
+            )
+            st.session_state.narrative[key] = [
+                line.strip()
+                for line in st.session_state[f"nar_{key}"].splitlines()
+                if line.strip()
+            ][:5]
+        else:
+            st.text_area(label, height=120, key=f"nar_{key}")
+            st.session_state.narrative[key] = st.session_state[f"nar_{key}"]
 
     st.text_area(
         INSIGHTS_LABEL + " — 한 줄에 한 항목",
