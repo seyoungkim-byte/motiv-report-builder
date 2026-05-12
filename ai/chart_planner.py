@@ -278,6 +278,131 @@ def _validate(items: list[Any]) -> list[dict[str, Any]]:
     return out
 
 
+# ────────────────────────────────────────────────────────────
+# Candidate mode — propose 4~5 charts for the user to pick from
+# ────────────────────────────────────────────────────────────
+CANDIDATE_PROMPT_SUFFIX = """
+[모드 변경 — 후보 제시]
+지금은 final 픽을 골라서 반환하지 마세요. 이번 캠페인 데이터로 만들 수
+있는 **다양한 각도**의 차트 후보를 **4~5개** 제시합니다. 사용자가 UI
+에서 직접 0~2개를 골라 빌드에 포함합니다.
+
+선택 다양성 원칙:
+- 같은 메트릭을 다른 템플릿으로 한 번 더 보여주는 것은 OK (예: 성장률을
+  bar_horizontal vs bar_vertical_pair).
+- 하지만 데이터가 빈약한 후보 (값 1개로 만든 차트, 모호한 비교) 는 금지.
+- 각 후보 caption 은 그 차트가 캠페인 어떤 부분을 입증하는지 1줄로 명시.
+
+placement quota 무시 — 모두 "performance" 로 두어도 됩니다.
+"""
+
+
+def _validate_candidates(items: list[Any]) -> list[dict[str, Any]]:
+    """Like _validate() but skips placement quotas and caps at 5."""
+    out: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        tpl = item.get("template")
+        plc = item.get("placement")
+        if tpl not in TEMPLATE_NAMES:
+            continue
+        if plc not in PLACEMENT_VALUES:
+            plc = "performance"
+        data = item.get("data")
+        if not isinstance(data, dict):
+            continue
+        if not _data_looks_valid(tpl, data):
+            continue
+        out.append({
+            "template": tpl,
+            "placement": plc,
+            "title":    str(item.get("title") or ""),
+            "subtitle": str(item.get("subtitle") or ""),
+            "caption":  str(item.get("caption") or ""),
+            "data":     data,
+        })
+        if len(out) >= 5:
+            break
+    return out
+
+
+def plan_chart_candidates(
+    campaign_payload: dict[str, Any],
+    narrative: dict[str, Any],
+    *,
+    campaign_context_prose: str = "",
+    user_instruction: str = "",
+    debug: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Propose up to 5 chart candidates for user selection in the UI.
+
+    Differs from plan_charts():
+      - Asks Claude for diverse candidates instead of final picks
+      - No placement quotas
+      - Includes optional `user_instruction` as a steering directive
+        ("X 데이터로 도넛을 추가", "성장률 비교는 빼고 가치지수 위주" etc.)
+    """
+    settings = load_settings()
+
+    db_block   = "[DB 보조 데이터]\n" + json.dumps(campaign_payload, ensure_ascii=False, indent=2, sort_keys=True)
+    nar_block  = "[내러티브 초안]\n" + json.dumps(narrative, ensure_ascii=False, indent=2)
+    prose_clean = (campaign_context_prose or "").strip()
+    prose_block = "[캠페인 컨텍스트 — 1차 사실]\n" + (prose_clean or "(없음)")
+    instr_clean = (user_instruction or "").strip()
+    instr_block = (
+        "\n\n[사용자 지시 — 절대 따라야 함]\n" + instr_clean
+        if instr_clean else ""
+    )
+
+    user_text = (
+        f"{db_block}\n\n{nar_block}\n\n{prose_block}{instr_block}\n\n"
+        "[지시] 다양한 각도의 차트 후보 4~5개를 JSON 으로 반환하세요."
+        f"{JSON_RETURN_HINT}"
+    )
+
+    try:
+        response = _client().messages.create(
+            model=settings.anthropic_text_model,
+            max_tokens=3072,
+            thinking={"type": "disabled"},
+            system=[
+                {
+                    "type": "text",
+                    "text": SYSTEM_PROMPT + CANDIDATE_PROMPT_SUFFIX,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ],
+            messages=[{"role": "user", "content": [{"type": "text", "text": user_text}]}],
+        )
+    except Exception as e:
+        if debug is not None:
+            debug.update(reason="api_error", detail=f"{type(e).__name__}: {e}", picked=0)
+        return []
+
+    text = next((b.text for b in response.content if b.type == "text"), "")
+    if debug is not None:
+        debug["raw"] = (text or "")[:800]
+    if not text:
+        if debug is not None:
+            debug.update(reason="no_text", detail="", picked=0)
+        return []
+    try:
+        data = json.loads(_strip_codefence(text))
+    except json.JSONDecodeError as e:
+        if debug is not None:
+            debug.update(reason="json_error", detail=str(e), picked=0)
+        return []
+
+    raw = data.get("charts") or []
+    if not isinstance(raw, list):
+        return []
+    validated = _validate_candidates(raw)
+    if debug is not None:
+        debug.update(reason="validated", detail=f"claude={len(raw)} validated={len(validated)}", picked=len(raw))
+    return validated
+
+
 def _data_looks_valid(template: str, data: dict[str, Any]) -> bool:
     """Cheap structural check — bail on obviously malformed payloads
     so the renderer doesn't crash mid-build."""

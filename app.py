@@ -17,7 +17,13 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from ai import NARRATIVE_SECTIONS, generate_hero_image, generate_narrative, plan_charts
+from ai import (
+    NARRATIVE_SECTIONS,
+    generate_hero_image,
+    generate_narrative,
+    plan_charts,
+    plan_chart_candidates,
+)
 from ai.narrative import (
     BULLET_SECTIONS,
     INSIGHTS_KEY,
@@ -143,6 +149,10 @@ def _reset_campaign_state(data: CampaignData):
     st.session_state.subhead = ""
     st.session_state.hero_path = None
     st.session_state.last_build = None
+    # 차트 후보 / 선택도 캠페인마다 리셋 — 옛 후보가 새 캠페인에 섞이면 사고
+    st.session_state.chart_candidates = []
+    st.session_state.chart_selected = set()
+    st.session_state.chart_instruction = ""
     if "metrics_editor" in st.session_state:
         del st.session_state["metrics_editor"]
 
@@ -443,7 +453,89 @@ with col_r:
         st.image(st.session_state.hero_path)
 
     st.divider()
-    st.subheader("6. 산출물 생성")
+    st.subheader("6. 차트 큐레이션 (선택)")
+    st.caption(
+        "비워두면 빌드 시 AI 가 자동으로 0~2개 선택. 직접 고르려면 아래에서 "
+        "후보를 받아 체크하세요."
+    )
+    _instr = st.text_area(
+        "Claude 에게 추가 지시 (선택)",
+        key="chart_instruction",
+        height=80,
+        placeholder=(
+            "예: '구매 성장률은 vertical_pair 로 보여줘'\n"
+            "예: 'donut 은 빼고 funnel 위주로'\n"
+            "예: 'index_lift 1개만 추천'"
+        ),
+        help="비워두면 일반 후보 추천. 입력하면 Claude 가 이 지시를 따릅니다.",
+    )
+    if st.button("🎨 차트 후보 받기 (4~5개)", key="chart_candidates_btn"):
+        with st.spinner("후보 큐레이션 + 미리보기 렌더 중..."):
+            dbg: dict = {}
+            cands = plan_chart_candidates(
+                campaign.to_prompt_dict(),
+                st.session_state.narrative,
+                campaign_context_prose=st.session_state.context_prose,
+                user_instruction=_instr,
+                debug=dbg,
+            )
+            previews: list[dict] = []
+            for spec in cands:
+                try:
+                    spec["image_b64"] = render_chart(spec["template"], spec["data"])
+                    previews.append(spec)
+                except Exception as e:
+                    st.warning(f"후보 '{spec.get('title')}' 렌더 실패: {e}")
+            st.session_state.chart_candidates = previews
+            # 기본 선택: 상위 2개 자동 체크
+            st.session_state.chart_selected = set(range(min(2, len(previews))))
+            if not previews:
+                st.warning(
+                    f"후보 0개 — 사유: {dbg.get('reason','?')} / {dbg.get('detail','')}"
+                )
+                with st.expander("🔍 원응답 (앞 800자)"):
+                    st.code(dbg.get("raw", "(없음)"))
+
+    # 후보 그리드 — 체크박스 + 프리뷰 + 메타
+    cands = st.session_state.get("chart_candidates") or []
+    if cands:
+        st.caption(f"총 {len(cands)}개 후보. 0~2개 체크해서 빌드에 포함.")
+        selected: set = st.session_state.get("chart_selected", set())
+        # 최대 2개 강제
+        for i, c in enumerate(cands):
+            cols = st.columns([0.08, 0.92])
+            checked_now = cols[0].checkbox(
+                "", value=(i in selected), key=f"cand_{i}",
+                label_visibility="collapsed",
+            )
+            if checked_now:
+                selected.add(i)
+            else:
+                selected.discard(i)
+            with cols[1]:
+                st.markdown(
+                    f"**{c.get('title','(제목 없음)')}**  "
+                    f"_<span style='color:#7d8c4e'>{c.get('template','')}</span>_",
+                    unsafe_allow_html=True,
+                )
+                if c.get("image_b64"):
+                    import base64
+                    st.image(base64.b64decode(c["image_b64"]), width=420)
+                if c.get("caption"):
+                    st.caption(c["caption"])
+                st.markdown("---")
+        # 2개 캡 강제 — 사용자가 3개 이상 체크하면 나중 것 cut
+        if len(selected) > 2:
+            selected = set(sorted(selected)[:2])
+            st.warning("⚠️ 최대 2개까지만 빌드에 포함됩니다. 나머지는 자동 해제됨.")
+        st.session_state.chart_selected = selected
+        st.success(
+            f"✅ {len(selected)}/2 개 선택됨" if selected else
+            "체크된 후보가 없습니다 — 빌드 시 AI 자동 픽으로 폴백."
+        )
+
+    st.divider()
+    st.subheader("7. 산출물 생성")
     out_dir: Path = settings.output_dir / campaign.campaign_no
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -482,32 +574,46 @@ with col_r:
             if str(r.get("indicator", "")).strip() and str(r.get("value", "")).strip()
         ]
 
-        # Chart planning + rendering. Failures degrade silently into a
-        # metrics-table fallback, but we surface a status line so the user
-        # can tell *why* charts didn't appear (API error vs. Claude judged
-        # data too thin vs. all picks invalid).
+        # Chart selection path — prefer user-curated candidates, fall back
+        # to auto plan_charts() when the user hasn't run candidate mode.
         chart_set: list[dict] = []
         chart_debug: dict = {}
-        try:
-            with st.spinner("차트 큐레이션 중 (Claude)..."):
-                planned = plan_charts(
-                    campaign.to_prompt_dict(),
-                    st.session_state.narrative,
-                    campaign_context_prose=st.session_state.context_prose,
-                    debug=chart_debug,
-                )
-            for spec in planned:
-                try:
-                    img_b64 = render_chart(spec["template"], spec["data"])
-                    chart_set.append({**spec, "image_b64": img_b64})
-                except Exception as e:
-                    st.warning(f"차트 '{spec.get('title')}' 렌더 실패: {e}")
-        except Exception as e:
-            st.warning(f"차트 큐레이션 단계 실패 (테이블로 폴백): {e}")
+        user_cands = st.session_state.get("chart_candidates") or []
+        user_picks = st.session_state.get("chart_selected") or set()
+
+        if user_cands and user_picks:
+            # User curated path — use only checked candidates (already pre-rendered)
+            ordered = sorted(user_picks)[:2]
+            for idx in ordered:
+                if 0 <= idx < len(user_cands):
+                    chart_set.append(user_cands[idx])
+            chart_debug.update(
+                reason="user_curated",
+                detail=f"selected {len(chart_set)}/{len(user_cands)} candidates",
+            )
+        else:
+            # Auto path — old behavior, AI silently picks up to 2
+            try:
+                with st.spinner("차트 큐레이션 중 (Claude)..."):
+                    planned = plan_charts(
+                        campaign.to_prompt_dict(),
+                        st.session_state.narrative,
+                        campaign_context_prose=st.session_state.context_prose,
+                        debug=chart_debug,
+                    )
+                for spec in planned:
+                    try:
+                        img_b64 = render_chart(spec["template"], spec["data"])
+                        chart_set.append({**spec, "image_b64": img_b64})
+                    except Exception as e:
+                        st.warning(f"차트 '{spec.get('title')}' 렌더 실패: {e}")
+            except Exception as e:
+                st.warning(f"차트 큐레이션 단계 실패 (테이블로 폴백): {e}")
 
         # Visible status: who/what decided there were no charts.
         if chart_set:
-            st.success(f"📈 차트 {len(chart_set)}개 생성 → 04 영역에 반영")
+            mode = "사용자 큐레이션" if chart_debug.get("reason") == "user_curated" else "AI 자동 픽"
+            st.success(f"📈 차트 {len(chart_set)}개 생성 ({mode}) → 04 영역에 반영")
         else:
             reason = chart_debug.get("reason", "unknown")
             detail = chart_debug.get("detail", "")

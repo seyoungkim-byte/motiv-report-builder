@@ -5,17 +5,27 @@
 {{ subhead }}
 {% endif %}
 
+{# 헤더 옆 3 칩에 해당 — 보도자료 TXT 에서는 상단 요약 박스 #}
+{% if narrative.tldr %}
+■ Highlights
+{% for item in narrative.tldr %}- {{ item }}
+{% endfor %}
+{% endif %}
+
 ■ 요약
 {{ narrative.summary }}
 
-■ 01. 캠페인 개요
-{{ narrative.overview }}
+{# 새 스키마: list[str] 이면 각 줄을 - 불릿으로, 옛 스키마: str 이면 그대로 #}
+{% macro section(title, val) %}
+■ {{ title }}
+{% if val is string %}{{ val }}
+{% elif val %}{% for it in val %}- {{ it }}
+{% endfor %}{% endif %}
+{% endmacro %}
 
-■ 02. 광고 집행 배경
-{{ narrative.background }}
-
-■ 03. 적용 전략
-{{ narrative.strategy }}
+{{ section('01. 캠페인 개요', narrative.overview) }}
+{{ section('02. 광고 집행 배경', narrative.background) }}
+{{ section('03. 적용 전략 · 핵심 성과', narrative.strategy) }}
 
 ■ 04. 캠페인 성과
 {% if campaign.metrics_table %}
