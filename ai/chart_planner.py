@@ -70,6 +70,23 @@ SYSTEM_PROMPT = """당신은 데이터 시각화 큐레이터입니다.
 - freq_distribution  : 빈도 구간별 분포 (1회/2회/3-4회/5+).
                        data = {buckets:[{name,value,share}...], total_label}
 
+[원본 DB 컬럼 활용 — 중요]
+입력 payload 의 `extras.view_row` 에는 DB 의 원본 숫자 컬럼이 모두
+들어있습니다. 그리고 `raw_pairs` 에는 자동 추출된 motiv(광고 노출자)
+vs total(전체) / pre vs curr 의 쌍이 정리되어 있습니다.
+
+**판단 기준**:
+- metrics_table 의 derived 값 (예: "구매 성장률 +358.3%") 만 보고 차트를
+  만들면 index_lift 1개로 끝남.
+- 같은 메트릭의 **원본 카운트가 raw_pairs 에 있으면** bar_vertical_pair
+  (전 vs 당월, motiv vs total) 로 절대 수치를 같이 보여주는 게 훨씬
+  설득력 있음.
+- 예: motiv_view_uv=565,772 / total_view_uv=13,921,000 페어가 있다면
+  bar_vertical_pair (categories=["전체","광고 노출"], a=[13921000], b=[565772])
+  로 도달 규모를 시각화. caption 에 "노출 비중 4.06%" 식으로 비율 추가.
+- 단, raw 값들의 자릿수 차이가 1000배 이상이면 bar_vertical_pair 가
+  잘 안 보이니, donut (점유율) 이나 index_lift 로 대체.
+
 [value_format 작성 규칙 — 중요]
 **Python str.format 패턴만 사용**. Excel/한글 패턴(#,##0 / 0.0% / +0.0% 등) 금지.
 좋은 예:
@@ -127,6 +144,64 @@ JSON_RETURN_HINT = (
 )
 
 
+def _extract_raw_pairs(extras: dict[str, Any] | None) -> dict[str, Any]:
+    """Surface DB-side raw comparison pairs so Claude doesn't have to dig
+    through view_row to find them.
+
+    Walks `extras.view_row` and groups columns into two categories:
+      - motiv_X / total_X  → "motiv-vs-total"  (광고노출 vs 전체)
+      - X_prev  / X_curr   → "pre-vs-curr"     (전월 vs 당월)
+      - X_curr  / X_growth (existing %) → exposes the % alongside
+
+    Returns a dict keyed by the shared suffix (e.g. "view_uv", "pur_count").
+    Empty dict if view_row is missing or no pairs found.
+    """
+    if not isinstance(extras, dict):
+        return {}
+    view = extras.get("view_row") or {}
+    if not isinstance(view, dict):
+        return {}
+
+    def _as_num(v: Any) -> float | None:
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+
+    pairs: dict[str, Any] = {}
+
+    # motiv_X / total_X 자동 매칭
+    for key in view:
+        if key.startswith("motiv_"):
+            suffix = key[len("motiv_"):]
+            counter = "total_" + suffix
+            if counter in view:
+                m = _as_num(view[key])
+                t = _as_num(view[counter])
+                if m is not None and t is not None and t > 0:
+                    pairs.setdefault(suffix, {})
+                    pairs[suffix]["motiv"] = m
+                    pairs[suffix]["total"] = t
+                    pairs[suffix]["share_pct"] = round(m / t * 100, 2)
+
+    # X_prev / X_curr 자동 매칭 (DMP 가 노출하는 시계열 페어)
+    for key in view:
+        if key.endswith("_prev"):
+            base = key[:-5]
+            curr_key = base + "_curr"
+            if curr_key in view:
+                p = _as_num(view[key])
+                c = _as_num(view[curr_key])
+                if p is not None and c is not None:
+                    pairs.setdefault(base, {})
+                    pairs[base]["prev"] = p
+                    pairs[base]["curr"] = c
+                    if p > 0:
+                        pairs[base]["growth_pct"] = round((c - p) / p * 100, 2)
+
+    return pairs
+
+
 def _strip_codefence(text: str) -> str:
     """Tolerate `````json … `````, ```` ``` … ``` ````, or bare-JSON returns.
     Claude is told not to wrap in fences but occasionally does anyway."""
@@ -170,9 +245,17 @@ def plan_charts(
     """
     settings = load_settings()
 
+    raw_pairs = _extract_raw_pairs(campaign_payload.get("extras"))
     db_block = (
         "[DB 보조 데이터]\n"
         + json.dumps(campaign_payload, ensure_ascii=False, indent=2, sort_keys=True)
+    )
+    pairs_block = (
+        "[DB 원본 비교 페어 — 차트 1순위 재료]\n"
+        + json.dumps(raw_pairs, ensure_ascii=False, indent=2, sort_keys=True)
+        + "\n(motiv vs total 또는 prev vs curr 페어. 같은 메트릭의 원본 카운트가\n"
+          "여기 있으면 derived % 차트(index_lift) 보다 bar_vertical_pair 가 우선.)"
+        if raw_pairs else "[DB 원본 비교 페어]\n(추출된 페어 없음 — extras.view_row 부재 또는 컬럼 패턴 미매칭)"
     )
     nar_block = (
         "[내러티브 초안]\n"
@@ -184,7 +267,7 @@ def plan_charts(
     )
 
     user_text = (
-        f"{db_block}\n\n{nar_block}\n\n{prose_block}\n\n"
+        f"{db_block}\n\n{pairs_block}\n\n{nar_block}\n\n{prose_block}\n\n"
         "[지시] 위 [원칙]에 따라 0~3개 차트를 선택해 JSON으로 반환하세요."
         f"{JSON_RETURN_HINT}"
     )
@@ -345,8 +428,15 @@ def plan_chart_candidates(
     """
     settings = load_settings()
 
-    db_block   = "[DB 보조 데이터]\n" + json.dumps(campaign_payload, ensure_ascii=False, indent=2, sort_keys=True)
-    nar_block  = "[내러티브 초안]\n" + json.dumps(narrative, ensure_ascii=False, indent=2)
+    raw_pairs   = _extract_raw_pairs(campaign_payload.get("extras"))
+    db_block    = "[DB 보조 데이터]\n" + json.dumps(campaign_payload, ensure_ascii=False, indent=2, sort_keys=True)
+    pairs_block = (
+        "[DB 원본 비교 페어 — 차트 1순위 재료]\n"
+        + json.dumps(raw_pairs, ensure_ascii=False, indent=2, sort_keys=True)
+        + "\n(같은 메트릭의 원본 카운트가 여기 있으면 derived % 보다 bar_vertical_pair 우선.)"
+        if raw_pairs else "[DB 원본 비교 페어]\n(추출 페어 없음)"
+    )
+    nar_block   = "[내러티브 초안]\n" + json.dumps(narrative, ensure_ascii=False, indent=2)
     prose_clean = (campaign_context_prose or "").strip()
     prose_block = "[캠페인 컨텍스트 — 1차 사실]\n" + (prose_clean or "(없음)")
     instr_clean = (user_instruction or "").strip()
@@ -356,8 +446,9 @@ def plan_chart_candidates(
     )
 
     user_text = (
-        f"{db_block}\n\n{nar_block}\n\n{prose_block}{instr_block}\n\n"
-        "[지시] 다양한 각도의 차트 후보 4~5개를 JSON 으로 반환하세요."
+        f"{db_block}\n\n{pairs_block}\n\n{nar_block}\n\n{prose_block}{instr_block}\n\n"
+        "[지시] 다양한 각도의 차트 후보 4~5개를 JSON 으로 반환하세요. "
+        "raw_pairs 가 있으면 그 중 최소 1개는 원본 카운트 기반(bar_vertical_pair) 후보로 포함."
         f"{JSON_RETURN_HINT}"
     )
 
