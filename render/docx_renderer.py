@@ -64,13 +64,24 @@ def render_press_docx(context: dict[str, Any], out_path: Path) -> Path:
     for key, title_text in [
         ("overview", "01. 캠페인 개요"),
         ("background", "02. 광고 집행 배경"),
-        ("strategy", "03. 적용 전략"),
+        ("strategy", "03. 적용 전략 · 핵심 성과"),
     ]:
-        body = (narrative.get(key) or "").strip()
-        if not body:
-            continue
-        _heading(doc, title_text, size=13)
-        doc.add_paragraph(body)
+        raw = narrative.get(key)
+        # 새 스키마 = list[str] 불릿, 옛 스키마 = str 단락. 둘 다 흡수.
+        if isinstance(raw, list):
+            items = [str(x).strip() for x in raw if str(x).strip()]
+            if not items:
+                continue
+            _heading(doc, title_text, size=13)
+            for item in items:
+                p = doc.add_paragraph(style="List Bullet")
+                p.add_run(item)
+        else:
+            body = (raw or "").strip() if isinstance(raw, str) else ""
+            if not body:
+                continue
+            _heading(doc, title_text, size=13)
+            doc.add_paragraph(body)
 
     # 04. results table
     metrics = campaign.get("metrics_table") or []
