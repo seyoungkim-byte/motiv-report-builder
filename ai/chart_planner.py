@@ -71,10 +71,19 @@ SYSTEM_PROMPT = """당신은 데이터 시각화 큐레이터입니다.
 charts: list. 각 항목:
   template   : 위 6개 중 하나
   placement  : "performance" 또는 "inline_strategy"
-  title      : 짧은 한국어 (≤ 20자)
-  subtitle   : 단위·기간 등 (선택)
+  title      : 짧은 한국어 (≤ 18자)
+  subtitle   : 단위·기간 등 (선택, 빈 문자열 가능)
   data       : 위 템플릿별 스키마 그대로
-  caption    : 차트 아래 한 줄 인사이트 (≤ 60자, 경어체)
+  caption    : 차트 아래 한 줄 (≤ 45자, 경어체)
+
+[caption 작성 규칙 — 중요]
+1. 내러티브 문장을 그대로 베끼지 마세요. 차트의 **숫자 1개를 명시**하고
+   그 숫자가 의미하는 바를 1줄로 압축합니다.
+2. 인접 텍스트(narrative.strategy / narrative.insights[N]) 의 주장을
+   **시각적으로 입증한다**는 다리 역할이어야 합니다. 동어반복 금지.
+3. 좋은 예: "광고 노출자 구매 성장률 +358.3%로 시즌 효과를 입증" (40자)
+   나쁜 예: "구매 성장률이 358.3%였습니다" (단순 사실 나열, 의미 없음)
+   나쁜 예: narrative.insights[0] 의 문장 첫 절을 그대로 따옴
 
 [제약]
 - performance ≤ 2, inline_strategy ≤ 1.
