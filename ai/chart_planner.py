@@ -84,22 +84,30 @@ charts: list. 각 항목:
 """
 
 
+# Anthropic json_schema strict mode requires `additionalProperties: false`
+# on every declared `type: "object"` AND requires every property to be in
+# `required`. The chart `data` payload varies by template (labels/values
+# for bar_horizontal vs stages for funnel etc.) so we leave it untyped —
+# the per-template structural contract is enforced by `_data_looks_valid`
+# downstream, not by the JSON schema.
 CHART_SCHEMA: dict[str, Any] = {
     "type": "object",
+    "additionalProperties": False,
     "properties": {
         "charts": {
             "type": "array",
             "items": {
                 "type": "object",
+                "additionalProperties": False,
                 "properties": {
                     "template":  {"type": "string", "enum": TEMPLATE_NAMES},
                     "placement": {"type": "string", "enum": PLACEMENT_VALUES},
                     "title":     {"type": "string"},
                     "subtitle":  {"type": "string"},
                     "caption":   {"type": "string"},
-                    "data":      {"type": "object"},
+                    "data":      {},
                 },
-                "required": ["template", "placement", "title", "data"],
+                "required": ["template", "placement", "title", "subtitle", "caption", "data"],
             },
         },
     },
