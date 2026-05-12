@@ -17,9 +17,10 @@ body {
 .page {
   width: 210mm;
   height: 297mm;
-  padding: 10mm 12mm 8mm;
+  padding: 9mm 11mm 7mm;
   display: flex;
   flex-direction: column;
+  overflow: hidden;                 /* hard 1-page guarantee */
 }
 
 /* ── Top band */
@@ -92,35 +93,34 @@ body {
 .p-metrics__value { color: #4e5a2d; font-weight: 700; white-space: nowrap; }
 .p-metrics__note { color: #6b6f63; font-size: 7.8pt; }
 
-/* ── Charts — performance zone (right col, replaces 04 table when AI picks charts) */
-.p-perf { display: flex; flex-direction: column; gap: 3mm; margin-bottom: 3mm; }
+/* ── Charts — performance zone (replaces 04 table when AI picks charts) */
+.p-perf { display: flex; flex-direction: column; gap: 2.5mm; margin-bottom: 2.5mm; }
 .p-perf-chart {
   margin: 0;
-  background: #f9f7f1;
-  border: 0.2mm solid #dfd9ca;
+  background: #f5efe4;            /* ivory — matches summary/about/stats */
+  border-top: 0.5mm solid #7d8c4e;
   border-radius: 1.5mm;
-  padding: 2mm 2.5mm 2.5mm;
+  padding: 1.8mm 2.5mm 2.2mm;
 }
 .p-perf-chart img {
   display: block;
   width: 100%;
   height: auto;
-  max-height: 48mm;
+  max-height: 36mm;               /* 48→36 — keep page on 1p when 2 charts */
   object-fit: contain;
 }
 .p-perf-chart figcaption {
-  margin-top: 1mm;
+  margin: 1.2mm 0 0;
   font-size: 7.5pt;
+  font-weight: 500;
   color: #4e5a2d;
   line-height: 1.35;
-  border-left: 0.5mm solid #7d8c4e;
-  padding-left: 2mm;
 }
 
-/* ── Inline chart row — small chart pinned to the right of 03 strategy text */
+/* ── Inline chart row (next to 03 strategy text) */
 .p-inline-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
   gap: 3mm;
   align-items: start;
   margin-bottom: 3mm;
@@ -128,34 +128,42 @@ body {
 .p-inline-row__text { margin: 0; font-size: 9pt; line-height: 1.5; }
 .p-inline-chart {
   margin: 0;
-  background: #f9f7f1;
-  border-left: 0.6mm solid #7d8c4e;
+  background: #f5efe4;
+  border-top: 0.5mm solid #7d8c4e;
   padding: 1.5mm 2mm;
-  border-radius: 0 1mm 1mm 0;
+  border-radius: 1mm;
 }
 .p-inline-chart img {
   display: block;
   width: 100%;
   height: auto;
-  max-height: 38mm;
+  max-height: 34mm;
   object-fit: contain;
 }
 .p-inline-chart figcaption {
-  margin-top: 0.8mm;
+  margin: 0.8mm 0 0;
   font-size: 7pt;
+  font-weight: 500;
   color: #4e5a2d;
   line-height: 1.3;
 }
 
 /* ── Insights */
-.p-insights { padding-left: 4mm; margin: 0 0 3mm; }
-.p-insights li { margin-bottom: 1.5mm; font-size: 8.8pt; line-height: 1.45; }
+.p-insights { padding-left: 3.5mm; margin: 0 0 2.5mm; }
+.p-insights li { margin-bottom: 1mm; font-size: 8.4pt; line-height: 1.4; }
 .p-insights li::marker { color: #7d8c4e; }
 
 /* ── About */
-.p-about { background: #f5efe4; border-radius: 2mm; padding: 2.5mm 3mm; margin-top: 2mm; }
-.p-about h3 { margin: 0 0 1mm; font-size: 9pt; color: #4e5a2d; }
-.p-about p { margin: 0; font-size: 8.2pt; line-height: 1.45; }
+.p-about {
+  background: #f5efe4;
+  border-radius: 2mm;
+  padding: 2mm 2.5mm;
+  margin-top: 1.5mm;
+  page-break-inside: avoid;        /* never split across pages */
+  break-inside: avoid;
+}
+.p-about h3 { margin: 0 0 0.8mm; font-size: 8.5pt; color: #4e5a2d; }
+.p-about p { margin: 0; font-size: 7.8pt; line-height: 1.4; }
 
 /* ── Footer */
 .p-footer {

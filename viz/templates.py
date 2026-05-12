@@ -67,15 +67,27 @@ def _format_value(value: float, fmt: str | None) -> str:
 
 
 def _add_title(fig, ax, spec: dict[str, Any]) -> None:
+    """Title rendered as bold olive header with a short underline accent.
+
+    Positioned via fig.text in figure coords so tight_layout doesn't
+    push it around. The underline mimics the magazine-style heading
+    used by the reference 1p case studies.
+    """
+    import matplotlib.lines as mlines
     title = spec.get("title") or ""
     subtitle = spec.get("subtitle") or ""
     if title:
-        fig.suptitle(title, fontsize=10.5, fontweight="bold",
-                     color=OLIVE_DARK, x=0.02, y=0.98, ha="left")
+        fig.text(0.015, 0.95, title, fontsize=10.5, fontweight="bold",
+                 color=OLIVE_DARK, ha="left", va="top")
+        underline = mlines.Line2D(
+            [0.015, 0.055], [0.918, 0.918],
+            transform=fig.transFigure,
+            color=OLIVE, linewidth=1.4, solid_capstyle="butt",
+        )
+        fig.add_artist(underline)
     if subtitle:
-        # use ax.set_title for subtitle so it sits closer to plot
-        ax.set_title(subtitle, fontsize=8, style="italic",
-                     color=MUTED, loc="left", pad=4)
+        fig.text(0.015, 0.892, subtitle, fontsize=7.5, style="italic",
+                 color=MUTED, ha="left", va="top")
 
 
 def _add_source(fig, spec: dict[str, Any]) -> None:
