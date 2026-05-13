@@ -70,22 +70,31 @@ SYSTEM_PROMPT = """당신은 데이터 시각화 큐레이터입니다.
 - freq_distribution  : 빈도 구간별 분포 (1회/2회/3-4회/5+).
                        data = {buckets:[{name,value,share}...], total_label}
 
-[원본 DB 컬럼 활용 — 중요]
-입력 payload 의 `extras.view_row` 에는 DB 의 원본 숫자 컬럼이 모두
-들어있습니다. 그리고 `raw_pairs` 에는 자동 추출된 motiv(광고 노출자)
-vs total(전체) / pre vs curr 의 쌍이 정리되어 있습니다.
+[메트릭 정의 카탈로그 활용 — 가장 중요]
+입력 payload 의 `extras.metric_catalog` 에는 이번 캠페인에 적용된
+공식 메트릭 정의가 들어 있습니다. 각 메트릭마다:
+  metric_id, display_name, tier1, tier3, description, formula, unit,
+  primary_value, views (시장평균 / 광고노출자 / 상대지수 등 sub-views)
 
-**판단 기준**:
-- metrics_table 의 derived 값 (예: "구매 성장률 +358.3%") 만 보고 차트를
-  만들면 index_lift 1개로 끝남.
-- 같은 메트릭의 **원본 카운트가 raw_pairs 에 있으면** bar_vertical_pair
-  (전 vs 당월, motiv vs total) 로 절대 수치를 같이 보여주는 게 훨씬
-  설득력 있음.
-- 예: motiv_view_uv=565,772 / total_view_uv=13,921,000 페어가 있다면
-  bar_vertical_pair (categories=["전체","광고 노출"], a=[13921000], b=[565772])
-  로 도달 규모를 시각화. caption 에 "노출 비중 4.06%" 식으로 비율 추가.
-- 단, raw 값들의 자릿수 차이가 1000배 이상이면 bar_vertical_pair 가
-  잘 안 보이니, donut (점유율) 이나 index_lift 로 대체.
+**활용 원칙**:
+1. **차트 제목·캡션은 metric_catalog 의 display_name 을 그대로 사용**.
+   "조회 기여도" 가 카탈로그에 있다면 "조회 비중" / "조회 전환" 같은
+   임의 변형 금지.
+2. **caption 작성 시 description + formula 를 인용**. 단순히 "X% 였습니다"
+   가 아니라 "{formula 요약} → {primary_value}{unit}" 식으로 의미 명시.
+3. **multi-view 메트릭은 bar_vertical_pair 1순위 후보**.
+   views 안에 market/motiv/relative 가 다 있으면:
+     - market.value vs motiv.value 로 bar_vertical_pair (절대 명수 대비)
+     - relative.value 를 index_lift 로 (상대지수 vs 100 baseline)
+     - 둘 다 가능하면 다른 메트릭에서 하나씩 사용해 다양성 확보.
+4. **단, 자릿수 차이가 1000배 이상이면** bar_vertical_pair 가 안 보이니
+   donut (점유율) 또는 index_lift 로 대체. metric.unit 이 "지수" 면
+   index_lift, "%" 면 donut/bar_horizontal.
+
+[원본 DB 컬럼 추가 활용 — 보조]
+`extras.view_row` 에는 DB 의 모든 숫자 컬럼이 있고 `raw_pairs` 에
+motiv vs total / pre vs curr 페어가 자동 정리돼 있습니다. 카탈로그에
+명시 안 된 보조 비교 (예: 빈도 분포, 코호트 retention) 가 필요할 때 활용.
 
 [value_format 작성 규칙 — 중요]
 **Python str.format 패턴만 사용**. Excel/한글 패턴(#,##0 / 0.0% / +0.0% 등) 금지.
@@ -246,16 +255,22 @@ def plan_charts(
     settings = load_settings()
 
     raw_pairs = _extract_raw_pairs(campaign_payload.get("extras"))
+    catalog = (campaign_payload.get("extras") or {}).get("metric_catalog") or []
+    catalog_block = (
+        "[메트릭 카탈로그 — 공식 정의 + 현 값. 차트 제목·캡션 1순위 출처]\n"
+        + json.dumps(catalog, ensure_ascii=False, indent=2)
+        if catalog else
+        "[메트릭 카탈로그]\n(비어있음 — metric_definitions 테이블 미연결 또는 미적용)"
+    )
     db_block = (
-        "[DB 보조 데이터]\n"
+        "[DB 보조 데이터 — 카탈로그에 없는 raw 컬럼 활용용]\n"
         + json.dumps(campaign_payload, ensure_ascii=False, indent=2, sort_keys=True)
     )
     pairs_block = (
-        "[DB 원본 비교 페어 — 차트 1순위 재료]\n"
+        "[DB 원본 비교 페어 — 차트 보조 재료]\n"
         + json.dumps(raw_pairs, ensure_ascii=False, indent=2, sort_keys=True)
-        + "\n(motiv vs total 또는 prev vs curr 페어. 같은 메트릭의 원본 카운트가\n"
-          "여기 있으면 derived % 차트(index_lift) 보다 bar_vertical_pair 가 우선.)"
-        if raw_pairs else "[DB 원본 비교 페어]\n(추출된 페어 없음 — extras.view_row 부재 또는 컬럼 패턴 미매칭)"
+        + "\n(motiv vs total 또는 prev vs curr 페어. 카탈로그에 없는 추가 비교 필요 시 활용.)"
+        if raw_pairs else "[DB 원본 비교 페어]\n(추출된 페어 없음)"
     )
     nar_block = (
         "[내러티브 초안]\n"
@@ -267,7 +282,7 @@ def plan_charts(
     )
 
     user_text = (
-        f"{db_block}\n\n{pairs_block}\n\n{nar_block}\n\n{prose_block}\n\n"
+        f"{catalog_block}\n\n{db_block}\n\n{pairs_block}\n\n{nar_block}\n\n{prose_block}\n\n"
         "[지시] 위 [원칙]에 따라 0~3개 차트를 선택해 JSON으로 반환하세요."
         f"{JSON_RETURN_HINT}"
     )
@@ -429,11 +444,17 @@ def plan_chart_candidates(
     settings = load_settings()
 
     raw_pairs   = _extract_raw_pairs(campaign_payload.get("extras"))
+    catalog     = (campaign_payload.get("extras") or {}).get("metric_catalog") or []
+    catalog_block = (
+        "[메트릭 카탈로그 — 공식 정의 + 현 값. 차트 제목·캡션 1순위 출처]\n"
+        + json.dumps(catalog, ensure_ascii=False, indent=2)
+        if catalog else
+        "[메트릭 카탈로그]\n(비어있음)"
+    )
     db_block    = "[DB 보조 데이터]\n" + json.dumps(campaign_payload, ensure_ascii=False, indent=2, sort_keys=True)
     pairs_block = (
-        "[DB 원본 비교 페어 — 차트 1순위 재료]\n"
+        "[DB 원본 비교 페어 — 차트 보조 재료]\n"
         + json.dumps(raw_pairs, ensure_ascii=False, indent=2, sort_keys=True)
-        + "\n(같은 메트릭의 원본 카운트가 여기 있으면 derived % 보다 bar_vertical_pair 우선.)"
         if raw_pairs else "[DB 원본 비교 페어]\n(추출 페어 없음)"
     )
     nar_block   = "[내러티브 초안]\n" + json.dumps(narrative, ensure_ascii=False, indent=2)
@@ -446,9 +467,10 @@ def plan_chart_candidates(
     )
 
     user_text = (
-        f"{db_block}\n\n{pairs_block}\n\n{nar_block}\n\n{prose_block}{instr_block}\n\n"
+        f"{catalog_block}\n\n{db_block}\n\n{pairs_block}\n\n{nar_block}\n\n{prose_block}{instr_block}\n\n"
         "[지시] 다양한 각도의 차트 후보 4~5개를 JSON 으로 반환하세요. "
-        "raw_pairs 가 있으면 그 중 최소 1개는 원본 카운트 기반(bar_vertical_pair) 후보로 포함."
+        "메트릭 카탈로그가 있으면 그 메트릭의 display_name 을 차트 제목에 그대로 사용. "
+        "다중 view 메트릭은 bar_vertical_pair (market vs motiv) 와 index_lift (relative) 둘 다 후보로 제시 가능."
         f"{JSON_RETURN_HINT}"
     )
 
