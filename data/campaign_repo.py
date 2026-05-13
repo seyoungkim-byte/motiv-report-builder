@@ -26,6 +26,13 @@ import re
 from typing import Any
 
 from .contract import CampaignData, MetricRow
+from .metrics_catalog import (
+    MetricDef,
+    format_value,
+    load_catalog,
+    resolve_primary,
+    resolve_value,
+)
 from .supabase_client import get_client
 
 
@@ -186,40 +193,29 @@ class CampaignRepository:
         scraped_subs = scraped_subs or []
         ctv_rows = ctv_rows or []
         metrics: list[MetricRow] = []
+        applied_metric_ids: list[str] = []
 
-        # ── Tier 1: Conversion + value (from dashboard view)
-        _add(metrics, "구매 기여도",
-             _fmt_pct(row.get("pur_contribution")),
-             "캠페인 노출자 중 구매 비중")
+        # ── Catalog-driven population (L3 single source of truth).
+        # Each row in metric_definitions becomes a MetricRow if its primary
+        # view resolves against this view row. "planned" / unresolvable
+        # metrics are skipped silently — UI shows only what has data.
+        for md in load_catalog():
+            if md.is_planned:
+                continue
+            primary = resolve_primary(md, row)
+            if primary is None:
+                continue
+            metrics.append(MetricRow(
+                indicator=md.display_name,
+                value=format_value(primary, md.format_spec),
+                note=_short_note(md, row),
+            ))
+            applied_metric_ids.append(md.metric_id)
 
-        _add(metrics, "구매 성장률",
-             _fmt_pct(row.get("motiv_pur_growth"), signed=True),
-             "광고 노출자 전월 동기 대비")
-
-        _add(metrics, "유저 가치 지수",
-             _fmt_index(row.get("user_value_index")),
-             "100 = 평균. 광고 노출자 vs 전체 비교")
-
-        _add(metrics, "평균 구매 단가",
-             _fmt_money(row.get("motiv_avg_amount")),
-             "광고 노출자 평균")
-
-        # ── Tier 2: Reach (motiv vs total)
-        motiv_view = row.get("motiv_view_uv")
-        total_view = row.get("total_view_uv")
-        try:
-            if motiv_view and total_view and float(total_view) > 0:
-                ratio = float(motiv_view) / float(total_view) * 100
-                _add(metrics, "광고 도달 시청자",
-                     _fmt_count(motiv_view, unit="명"),
-                     f"전체 시청자 중 {ratio:.1f}%")
-        except (TypeError, ValueError):
-            pass
-
-        # ── Tier 2: Engagement growth
-        _add(metrics, "카트 추가 성장률",
-             _fmt_pct(row.get("motiv_eng_growth"), signed=True),
-             "광고 노출자 기준")
+        # Legacy fallback: if catalog returned nothing (DB not seeded yet),
+        # use the old hardcoded mapping so the builder still works.
+        if not metrics:
+            _legacy_metric_fallback(metrics, row)
 
         # ── Tier 3: CTV ad-delivery aggregates (from scraper)
         if scraped_subs:
@@ -279,5 +275,99 @@ class CampaignRepository:
                 "view_row": {k: v for k, v in row.items() if v is not None},
                 "scraped_subs_count": len(scraped_subs),
                 "ctv_products_count": len(ctv_rows),
+                # Catalog summary — what the AI should reason about. Includes
+                # description + formula + all sub-views so chart_planner can
+                # cite the exact calculation and pick richer chart types.
+                "metric_catalog": _catalog_payload(applied_metric_ids, row),
             },
         )
+
+
+def _short_note(md: MetricDef, row: dict[str, Any]) -> str:
+    """Note rendered under the metric value in the table.
+
+    For multi-view metrics, we surface the absolute motiv vs market figures
+    so the reader doesn't have to chase the raw columns. For single-value
+    metrics, we fall back to the metric description (trimmed)."""
+    if md.is_multi_view:
+        motiv_v = _resolve_named(md, row, "motiv")
+        market_v = _resolve_named(md, row, "market")
+        if motiv_v is not None and market_v is not None:
+            return f"광고노출자 {format_value(motiv_v, '{:,.0f}')} / 시장 {format_value(market_v, '{:,.0f}')}"
+    if md.description:
+        d = md.description.split(".")[0]
+        return d[:60]
+    return ""
+
+
+def _resolve_named(md: MetricDef, row: dict[str, Any], view_key: str):
+    v = md.views.get(view_key)
+    if v is None:
+        return None
+    return resolve_value(v, row)
+
+
+def _catalog_payload(metric_ids: list[str], row: dict[str, Any]) -> list[dict[str, Any]]:
+    """Compact catalog snapshot for the AI prompt.
+
+    For each metric currently applied to this campaign, emit:
+      - metric_id, display_name, tier1, tier3, description, formula, unit
+      - primary value (computed/looked-up)
+      - all view values keyed by view name
+    """
+    out: list[dict[str, Any]] = []
+    by_id = {m.metric_id: m for m in load_catalog()}
+    for mid in metric_ids:
+        md = by_id.get(mid)
+        if md is None:
+            continue
+        entry: dict[str, Any] = {
+            "metric_id":   md.metric_id,
+            "display_name": md.display_name,
+            "tier1":       md.tier1,
+            "tier3":       md.tier3,
+            "description": md.description,
+            "formula":     md.formula,
+            "unit":        md.unit,
+            "format":      md.format_spec,
+        }
+        primary = resolve_primary(md, row)
+        entry["primary_value"] = primary
+        if md.views:
+            entry["views"] = {}
+            for key, vw in md.views.items():
+                entry["views"][key] = {
+                    "label": vw.label,
+                    "value": resolve_value(vw, row),
+                    "raw_column": vw.value_column,
+                    "computed":   vw.computed_expr,
+                    "unit":       vw.unit,
+                    "format":     vw.format_spec,
+                }
+        out.append(entry)
+    return out
+
+
+# ──────────────────────────────────────────────── Legacy fallback
+def _legacy_metric_fallback(metrics: list[MetricRow], row: dict[str, Any]) -> None:
+    """Used only when metric_definitions table is empty/unreachable.
+    Keeps the builder working in degraded mode."""
+    _add(metrics, "구매 기여도",
+         _fmt_pct(row.get("pur_contribution")), "캠페인 노출자 중 구매 비중")
+    _add(metrics, "구매 성장률",
+         _fmt_pct(row.get("motiv_pur_growth"), signed=True), "광고 노출자 전월 동기 대비")
+    _add(metrics, "유저 가치 지수",
+         _fmt_index(row.get("user_value_index")), "100 = 평균. 광고 노출자 vs 전체")
+    _add(metrics, "평균 구매 단가",
+         _fmt_money(row.get("motiv_avg_amount")), "광고 노출자 평균")
+    motiv_view = row.get("motiv_view_uv"); total_view = row.get("total_view_uv")
+    try:
+        if motiv_view and total_view and float(total_view) > 0:
+            ratio = float(motiv_view) / float(total_view) * 100
+            _add(metrics, "광고 도달 시청자",
+                 _fmt_count(motiv_view, unit="명"),
+                 f"전체 시청자 중 {ratio:.1f}%")
+    except (TypeError, ValueError):
+        pass
+    _add(metrics, "장바구니 담기 성장률",
+         _fmt_pct(row.get("motiv_eng_growth"), signed=True), "광고 노출자 기준")
