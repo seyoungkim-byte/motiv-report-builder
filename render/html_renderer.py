@@ -19,6 +19,10 @@ def _build_jsonld(ctx: dict[str, Any]) -> str:
     campaign = ctx["campaign"]
     narrative = ctx["narrative"]
     description = (narrative.get("summary") or narrative.get("overview") or "")[:280]
+    # JSON-LD 는 search engine / AI 가 직접 인덱싱하므로 실제 광고주명 노출 금지.
+    # category (industry) 기반 마스킹 라벨로 대체. 매핑 없으면 generic.
+    industry = campaign.get("industry") or ""
+    masked = f"{industry} 광고주" if industry else "광고주"
     data = {
         "@context": "https://schema.org",
         "@type": "Article",
@@ -26,8 +30,8 @@ def _build_jsonld(ctx: dict[str, Any]) -> str:
         "description": description,
         "about": {
             "@type": "AdvertisingCampaign",
-            "name": campaign["campaign_name"],
-            "advertiser": {"@type": "Organization", "name": campaign["advertiser"]},
+            "name": masked,
+            "advertiser": {"@type": "Organization", "name": masked},
             "channel": campaign.get("channel"),
         },
         "author": {"@type": "Organization", "name": s.company_name, "url": s.company_url},

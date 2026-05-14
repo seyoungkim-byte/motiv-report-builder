@@ -284,8 +284,11 @@ with col_l:
     # (입력값이 한 rerun 늦거나 revert 되는 현상). key= 만으로 묶어 Streamlit
     # 이 상태를 직접 소유하게 함. 기본값은 _reset_campaign_state 에서 설정.
     if not st.session_state.get("headline"):
+        # 자동 헤드라인은 항상 마스킹 라벨 사용 — 실제 광고주/캠페인명이
+        # 리포트 산출물에 그대로 노출되지 않도록 한다. 사용자가 수동으로
+        # 헤드라인을 채우면 그 값이 우선 (수동 입력은 검열 대상 아님).
         st.session_state["headline"] = (
-            f"{campaign.advertiser}, {campaign.campaign_name} 캠페인 사례"
+            f"{campaign.masked_advertiser} 캠페인 사례"
         )
     st.text_input(
         "헤드라인",
@@ -421,8 +424,8 @@ with col_r:
             "이미지 브리프",
             value=(
                 f"{campaign.channel or 'CTV/Mobile'} 광고 케이스스터디 히어로 이미지. "
-                f"브랜드: {campaign.advertiser}. 업종: {campaign.industry or ''}. "
-                "담백한 에디토리얼 톤, 제품·라이프스타일 중심, 텍스트 없음."
+                f"업종: {campaign.industry or '광고 일반'}. "
+                "담백한 에디토리얼 톤, 라이프스타일 중심, 텍스트·로고·실제 브랜드 노출 없음."
             ),
             height=100,
             key="hero_brief",
