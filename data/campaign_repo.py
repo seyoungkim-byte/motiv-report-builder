@@ -151,7 +151,45 @@ class CampaignRepository:
 
         scraped_subs = self._fetch_scraped_subs(campaign_no)
         ctv_rows = self._fetch_ctv_reach(campaign_no)
-        return self._to_campaign(rows[0], scraped_subs, ctv_rows)
+        category_name = self._fetch_category_name(campaign_no)
+        return self._to_campaign(rows[0], scraped_subs, ctv_rows, category_name)
+
+    def _fetch_category_name(self, campaign_no: str) -> str | None:
+        """Look up Tier2 category name (e.g. '식품', '뷰티') for a campaign.
+
+        Used to mask the advertiser name in report outputs. campaign_master
+        carries category_id which FKs into categories.name_ko.
+        Returns None if unmapped — caller falls back to real brand.
+        """
+        if not self._client:
+            return None
+        try:
+            res = (
+                self._client.table("campaign_master")
+                .select("category_id")
+                .eq("campaign_no", campaign_no)
+                .limit(1)
+                .execute()
+            )
+            rows = res.data or []
+            if not rows:
+                return None
+            cat_id = rows[0].get("category_id")
+            if cat_id is None:
+                return None
+            res2 = (
+                self._client.table("categories")
+                .select("name_ko")
+                .eq("category_id", cat_id)
+                .limit(1)
+                .execute()
+            )
+            r2 = res2.data or []
+            if r2:
+                return str(r2[0].get("name_ko") or "") or None
+        except Exception:
+            return None
+        return None
 
     def _fetch_scraped_subs(self, campaign_no: str) -> list[dict[str, Any]]:
         """Pull all sub-campaigns the scraper recorded for this report."""
@@ -188,6 +226,7 @@ class CampaignRepository:
         row: dict[str, Any],
         scraped_subs: list[dict[str, Any]] | None = None,
         ctv_rows: list[dict[str, Any]] | None = None,
+        category_name: str | None = None,
     ) -> CampaignData:
         """Stitch all three sources into one CampaignData with auto-filled metrics."""
         scraped_subs = scraped_subs or []
@@ -262,7 +301,7 @@ class CampaignRepository:
             campaign_no=str(row.get("campaign_no") or ""),
             campaign_name=name,
             advertiser=_extract_brand(name),
-            industry=None,
+            industry=category_name,   # Tier2 카테고리명 — masked_advertiser 의 베이스
             period_start=str(row.get("start_date") or "") or None,
             period_end=str(row.get("end_date") or "") or None,
             channel=None,

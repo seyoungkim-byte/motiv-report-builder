@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<title>{{ headline }} | {{ campaign.advertiser }} 케이스스터디</title>
+<title>{{ headline }} | {{ campaign.industry or '광고' }} 케이스스터디</title>
 <meta name="description" content="{{ (narrative.summary or narrative.overview)[:160] }}">
 <meta property="og:title" content="{{ headline }}">
 <meta property="og:description" content="{{ (narrative.summary or narrative.overview)[:200] }}">

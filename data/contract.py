@@ -25,9 +25,9 @@ class MetricRow:
 @dataclass
 class CampaignData:
     campaign_no: str
-    campaign_name: str
-    advertiser: str
-    industry: str | None = None
+    campaign_name: str                  # 실제 캠페인명 (UI 식별·검색용)
+    advertiser: str                     # 실제 광고주명 (UI 식별용)
+    industry: str | None = None         # Tier2 카테고리명 (예: "식품", "뷰티") — 마스킹 베이스
     period_start: str | None = None
     period_end: str | None = None
     channel: str | None = None          # CTV / Mobile / Cross-device
@@ -38,16 +38,28 @@ class CampaignData:
     audience_insights: list[str] = field(default_factory=list)
     creative_summary: str | None = None
 
-    # Side-car payload for prompts that want more than the structured
-    # fields expose. Keep keys descriptive.
     extras: dict[str, Any] = field(default_factory=dict)
 
+    @property
+    def masked_advertiser(self) -> str:
+        """리포트 산출물 + AI prompt 에서 사용하는 마스킹 라벨.
+
+        "{Tier2 카테고리명} 광고주" 형태. 예: '식품 광고주', '뷰티 광고주'.
+        category 매핑 없으면 'advertiser' 로 fallback (마스킹 실패 시 안전).
+        """
+        if self.industry:
+            return f"{self.industry} 광고주"
+        return self.advertiser
+
     def to_prompt_dict(self) -> dict[str, Any]:
+        # AI 가 받는 모든 자리에 실제 브랜드명 노출 금지 — 마스킹 라벨로 대체.
+        # 검색·로드 단계 (UI) 에서는 self.advertiser / self.campaign_name 그대로 사용.
+        masked = self.masked_advertiser
         return {
             "campaign_no": self.campaign_no,
-            "campaign_name": self.campaign_name,
-            "advertiser": self.advertiser,
-            "industry": self.industry,
+            "campaign_name": masked,
+            "advertiser":   masked,
+            "industry":     self.industry,
             "period": f"{self.period_start or '?'} ~ {self.period_end or '?'}",
             "channel": self.channel,
             "objective": self.objective,
