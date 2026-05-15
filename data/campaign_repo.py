@@ -235,18 +235,38 @@ class CampaignRepository:
         applied_metric_ids: list[str] = []
 
         # ── Catalog-driven population (L3 single source of truth).
-        # Each row in metric_definitions becomes a MetricRow if its primary
-        # view resolves against this view row. "planned" / unresolvable
-        # metrics are skipped silently — UI shows only what has data.
+        # Multi-view 메트릭은 primary view 의 단위/포맷을 사용 — metric 전체
+        # format 을 강제 적용하면 신규 구매자율(지수)에 % 가 붙는 등 단위 오류 발생.
+        # 또한 indicator 에 primary view 라벨을 ()로 부착해 어떤 view 가
+        # 표시 중인지 명시 (예: "신규 구매자율 (상대지수)"). 다만 메트릭명에
+        # 이미 비중 의미가 들어있는 경우 (기여도) 는 중복 표기 회피.
         for md in load_catalog():
             if md.is_planned:
                 continue
-            primary = resolve_primary(md, row)
-            if primary is None:
+
+            if md.is_multi_view:
+                primary_v = md.primary_view_def()
+                if primary_v is None:
+                    continue
+                primary_val = resolve_value(primary_v, row)
+                value_fmt = primary_v.format_spec or md.format_spec
+                # view 라벨 suffix — "기여도" 가 이름에 있으면 이미 상대성 내포
+                view_label = primary_v.label or ""
+                if view_label and "기여도" not in md.display_name:
+                    indicator = f"{md.display_name} ({view_label})"
+                else:
+                    indicator = md.display_name
+            else:
+                primary_val = resolve_primary(md, row)
+                value_fmt = md.format_spec
+                indicator = md.display_name
+
+            if primary_val is None:
                 continue
+
             metrics.append(MetricRow(
-                indicator=md.display_name,
-                value=format_value(primary, md.format_spec),
+                indicator=indicator,
+                value=format_value(primary_val, value_fmt),
                 note=_short_note(md, row),
             ))
             applied_metric_ids.append(md.metric_id)
@@ -325,25 +345,23 @@ class CampaignRepository:
 def _short_note(md: MetricDef, row: dict[str, Any]) -> str:
     """Note rendered under the metric value in the table.
 
-    For multi-view metrics, we surface the absolute motiv vs market figures
-    so the reader doesn't have to chase the raw columns. For single-value
-    metrics, we fall back to the metric description (trimmed)."""
+    For multi-view metrics, we surface motiv vs market values with **each
+    view's own format** (so 명/% 단위가 자연스럽게 따라옴). For single-value
+    metrics, fall back to a trimmed description."""
     if md.is_multi_view:
-        motiv_v = _resolve_named(md, row, "motiv")
-        market_v = _resolve_named(md, row, "market")
-        if motiv_v is not None and market_v is not None:
-            return f"광고노출자 {format_value(motiv_v, '{:,.0f}')} / 시장 {format_value(market_v, '{:,.0f}')}"
+        motiv_v  = md.views.get("motiv")
+        market_v = md.views.get("market")
+        if motiv_v and market_v:
+            mv = resolve_value(motiv_v, row)
+            tv = resolve_value(market_v, row)
+            if mv is not None and tv is not None:
+                m_fmt = format_value(mv, motiv_v.format_spec  or md.format_spec)
+                t_fmt = format_value(tv, market_v.format_spec or md.format_spec)
+                return f"광고노출자 {m_fmt} / 시장 {t_fmt}"
     if md.description:
         d = md.description.split(".")[0]
         return d[:60]
     return ""
-
-
-def _resolve_named(md: MetricDef, row: dict[str, Any], view_key: str):
-    v = md.views.get(view_key)
-    if v is None:
-        return None
-    return resolve_value(v, row)
 
 
 def _catalog_payload(metric_ids: list[str], row: dict[str, Any]) -> list[dict[str, Any]]:
