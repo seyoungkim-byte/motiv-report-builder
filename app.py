@@ -127,6 +127,11 @@ _session_default("hero_path", None)
 _session_default("headline", "")
 _session_default("subhead", "")
 _session_default("context_prose", "")
+# Header meta — user-supplied fields not in DB (집행 상품 / 구매 측정 / 태그 / 누적 기간)
+_session_default("hdr_media_products", "")
+_session_default("hdr_measurement", "")
+_session_default("hdr_tags_raw", "")            # 한 줄에 한 태그
+_session_default("hdr_cumulative_period", "")
 
 
 # ─────────────────────────────────────── Sidebar: campaign picker
@@ -153,6 +158,11 @@ def _reset_campaign_state(data: CampaignData):
     st.session_state.chart_candidates = []
     st.session_state.chart_selected = set()
     st.session_state.chart_instruction = ""
+    # Header 메타도 캠페인 단위로 리셋
+    st.session_state.hdr_media_products = ""
+    st.session_state.hdr_measurement = ""
+    st.session_state.hdr_tags_raw = ""
+    st.session_state.hdr_cumulative_period = ""
     if "metrics_editor" in st.session_state:
         del st.session_state["metrics_editor"]
 
@@ -186,6 +196,16 @@ def _reset_campaign_state(data: CampaignData):
     saved_metrics = src.get("metrics_table") or []
     if saved_metrics:
         st.session_state.metrics_df = pd.DataFrame(saved_metrics)
+
+    # Header 메타 복원 (옛 빌드는 header_meta 없을 수 있음 — setdefault 처리)
+    hm = src.get("header_meta") or {}
+    if isinstance(hm, dict):
+        st.session_state.hdr_media_products    = hm.get("media_products", "")
+        st.session_state.hdr_measurement       = hm.get("measurement_source", "")
+        st.session_state.hdr_cumulative_period = hm.get("cumulative_period", "")
+        tags = hm.get("tags") or []
+        if isinstance(tags, list):
+            st.session_state.hdr_tags_raw = "\n".join(str(t) for t in tags if t)
 
     # 히어로 이미지 — 디스크에 다시 써서 기존 path-기반 UI 가 그대로 동작
     hero_bytes = src.get("hero_image")
@@ -296,6 +316,43 @@ with col_l:
         help="예시: '크로스디바이스 광고로 고객 획득 비용 53% 절감한 성인영양식 캠페인 사례'",
     )
     st.text_input("서브헤드 (선택)", key="subhead")
+
+    # ── 2-B. 캠페인 운영 개요 (헤더 메타) ──────────────────
+    # DB 에 있는 값(광고주·기간·번호) 은 자동 prefill, DB 에 없는 값(상품·측정·태그)
+    # 은 사용자가 직접 입력. reference 디자인의 헤더 meta 행을 1단 노트 톤에 흡수.
+    with st.expander("📋 캠페인 운영 개요 (헤더 메타 정보)", expanded=False):
+        st.caption(
+            f"자동 채움 — 광고주: **{campaign.masked_advertiser}**  ·  "
+            f"기간: **{campaign.period_start or '?'} ~ {campaign.period_end or '?'}**  ·  "
+            f"No. **{campaign.campaign_no}**"
+        )
+        st.text_input(
+            "집행 상품 (선택)",
+            key="hdr_media_products",
+            placeholder="예: CrossTarget TV (CTV) + CrossTarget DA (모바일)",
+            help="reference 의 '집행 상품' 자리. 비워두면 헤더에 표시 안 됨.",
+        )
+        st.text_input(
+            "구매·전환 측정 데이터 (선택)",
+            key="hdr_measurement",
+            placeholder="예: 롯데멤버스 DMP 실결제 데이터",
+            help="데이터 소스 명시 — GEO 신뢰 신호 + 사람이 보기에 권위 ↑",
+        )
+        st.text_input(
+            "전체 누적 기간 (선택)",
+            key="hdr_cumulative_period",
+            placeholder="예: 전체 누적 2025.11 ~",
+            help="이번 보고 기간 외 누적 집행 시작일이 있을 때만 입력.",
+        )
+        st.text_area(
+            "채널·특징 태그 (선택, 한 줄에 한 태그)",
+            key="hdr_tags_raw",
+            height=90,
+            placeholder=(
+                "CTV 광고\nDA 모바일 광고\nDMP 구매 데이터 측정\n경쟁사 고객 브랜드 전환"
+            ),
+            help="헤더 하단의 작은 칩으로 노출됩니다. 4~5개 권장.",
+        )
 
     st.subheader("3. 캠페인 컨텍스트 & 내러티브")
     st.text_area(
@@ -635,12 +692,32 @@ with col_r:
             with st.expander("🔍 chart_planner 원응답 (앞 600자)"):
                 st.code(chart_debug.get("raw", "(없음)"))
 
+        # Header meta — DB 자동값 + 사용자 입력 합쳐서 한 dict 로
+        header_tags = [
+            t.strip()
+            for t in (st.session_state.hdr_tags_raw or "").splitlines()
+            if t.strip()
+        ]
+        header_meta = {
+            # 사용자 입력
+            "media_products":     (st.session_state.hdr_media_products or "").strip(),
+            "measurement_source": (st.session_state.hdr_measurement or "").strip(),
+            "cumulative_period":  (st.session_state.hdr_cumulative_period or "").strip(),
+            "tags":               header_tags,
+            # DB 자동
+            "advertiser":   campaign.masked_advertiser,
+            "campaign_no":  campaign.campaign_no,
+            "period_start": campaign.period_start,
+            "period_end":   campaign.period_end,
+        }
+
         context = {
             "headline": st.session_state.headline,
             "subhead": st.session_state.subhead,
             "campaign": asdict(campaign),
             "narrative": st.session_state.narrative,
             "chart_set": chart_set,
+            "header_meta": header_meta,
             "hero_image_url": Path(st.session_state.hero_path).as_uri()
             if st.session_state.hero_path
             else None,
@@ -686,6 +763,13 @@ with col_r:
                 hero_bytes = Path(st.session_state.hero_path).read_bytes()
             except Exception:
                 hero_bytes = None
+        # 저장은 사용자 입력만 — DB 자동값은 매 빌드마다 재구성하므로 보존 불필요
+        header_meta_to_save = {
+            "media_products":     header_meta["media_products"],
+            "measurement_source": header_meta["measurement_source"],
+            "cumulative_period":  header_meta["cumulative_period"],
+            "tags":               header_meta["tags"],
+        }
         ok = save_build(
             campaign_no=campaign.campaign_no,
             user_email=user_email,
@@ -694,6 +778,7 @@ with col_r:
             context_prose=st.session_state.context_prose,
             narrative=st.session_state.narrative,
             metrics_table=df.to_dict(orient="records"),
+            header_meta=header_meta_to_save,
             hero_image=hero_bytes,
             html=html_bytes,
             pdf=pdf_bytes,

@@ -43,6 +43,7 @@ def save_build(
     context_prose: str,
     narrative: dict,
     metrics_table: list[dict],
+    header_meta: dict | None,
     hero_image: bytes | None,
     html: bytes,
     pdf: bytes,
@@ -62,6 +63,7 @@ def save_build(
             "context_prose": context_prose or "",
             "narrative": narrative or {},
             "metrics_table": metrics_table or [],
+            "header_meta": header_meta or {},
             "hero_image_b64": _b64encode(hero_image),
             "html_b64": _b64encode(html),
             "pdf_b64":  _b64encode(pdf),
@@ -118,6 +120,7 @@ def load_build(campaign_no: str) -> dict[str, Any] | None:
         "context_prose": row.get("context_prose") or "",
         "narrative": row.get("narrative") or {},
         "metrics_table": row.get("metrics_table") or [],
+        "header_meta": row.get("header_meta") or {},
         "hero_image": _b64decode(row.get("hero_image_b64")),
         "files": files,
     }
