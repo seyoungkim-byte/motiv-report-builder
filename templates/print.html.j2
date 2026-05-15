@@ -101,7 +101,7 @@
     </div>
     {% endif %}
 
-    {# 본문 섹션 — 각각 list[str] 의 불릿 (만연체 X, 한투/KB 톤) #}
+    {# 본문 섹션 매크로 — list 면 불릿, str 면 단락 #}
     {% macro section(num, title, items) %}
       <h2><span class="sec-num">{{ num }}</span>{{ title }}</h2>
       {% if items is string %}
@@ -113,11 +113,48 @@
       {% endif %}
     {% endmacro %}
 
-    {{ section('01', '캠페인 개요',           narrative.overview)   }}
-    {{ section('02', '광고 집행 배경',         narrative.background) }}
-    {{ section('03', '적용 전략 · 핵심 성과',  narrative.strategy)   }}
+    {# ── 2단 — 좌측 본문 / 우측 04 성과 지표 표 ── #}
+    <div class="body-grid">
+      <div class="body-grid__main">
+        {{ section('01', '캠페인 개요',           narrative.overview)   }}
+        {{ section('02', '광고 집행 배경',         narrative.background) }}
+        {{ section('03', '적용 전략 · 핵심 성과',  narrative.strategy)   }}
+      </div>
 
-    {# 차트 — [그림 N] 라벨링, 본문 흐름 안에서 직접 노출 #}
+      {% if campaign.metrics_table %}
+      <aside class="body-grid__side">
+        <h2><span class="sec-num">04</span>캠페인 성과</h2>
+        <table class="metrics metrics--side">
+          <thead>
+            <tr><th>성과 지표</th><th>성과</th><th>비고</th></tr>
+          </thead>
+          <tbody>
+            {% for m in campaign.metrics_table %}
+            <tr>
+              <td class="metrics__indicator">{{ m.indicator }}</td>
+              <td class="metrics__value">{{ m.value }}</td>
+              <td class="metrics__note">{{ m.note }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </aside>
+      {% endif %}
+    </div>
+
+    {# ── 핵심 인사이트 callout (풀폭) — 차트 위에 배치 ── #}
+    {% if narrative.insights %}
+    <div class="insights-box">
+      <h3>핵심 인사이트</h3>
+      <ul>
+        {% for item in narrative.insights %}
+        <li>{{ item }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {# ── 차트 (그림 N) — 인사이트 BELOW. 풀폭. ── #}
     {% set all_charts = (charts.performance or []) + ([charts.inline_strategy] if charts.inline_strategy else []) %}
     {% if all_charts %}
     <div class="figs">
@@ -131,33 +168,6 @@
         {% if ch.caption %}<figcaption>{{ ch.caption }}</figcaption>{% endif %}
       </figure>
       {% endfor %}
-    </div>
-    {% elif campaign.metrics_table %}
-    <table class="metrics">
-      <thead>
-        <tr><th>성과 지표</th><th>성과</th><th>비고</th></tr>
-      </thead>
-      <tbody>
-        {% for m in campaign.metrics_table %}
-        <tr>
-          <td class="metrics__indicator">{{ m.indicator }}</td>
-          <td class="metrics__value">{{ m.value }}</td>
-          <td class="metrics__note">{{ m.note }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% endif %}
-
-    {# ── 핵심 인사이트 callout ─────────────────────────── #}
-    {% if narrative.insights %}
-    <div class="insights-box">
-      <h3>핵심 인사이트</h3>
-      <ul>
-        {% for item in narrative.insights %}
-        <li>{{ item }}</li>
-        {% endfor %}
-      </ul>
     </div>
     {% endif %}
   </section>

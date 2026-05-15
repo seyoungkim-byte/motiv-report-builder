@@ -165,6 +165,22 @@ body {
 
 /* ─── Body sections ──────────────────────────────────── */
 .body { display: flex; flex-direction: column; gap: 6px; }
+.body-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+  margin-bottom: 12px;
+}
+.body-grid__main h2:first-of-type { margin-top: 0; }
+.body-grid__side h2:first-of-type { margin-top: 0; }
+.metrics--side { font-size: 12.5px; }
+.metrics--side thead th { padding: 8px 10px; font-size: 11px; }
+.metrics--side tbody td { padding: 7px 10px; }
+.metrics--side .metrics__note { font-size: 11.5px; }
+@media (max-width: 720px) {
+  .body-grid { grid-template-columns: 1fr; }
+}
 .body h2 {
   margin: 14px 0 6px;
   font-size: 17px;

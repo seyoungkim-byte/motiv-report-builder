@@ -159,6 +159,21 @@ body {
 
 /* ─── Body ──────────────────────────────────────────── */
 .body { margin: 0; flex: 1; }
+/* 2단 본문 — 좌: 01/02/03 / 우: 04 성과 지표 표 */
+.body-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 5mm;
+  margin: 0 0 3mm;
+  align-items: start;
+}
+.body-grid__main h2:first-of-type { margin-top: 0; }
+.body-grid__side h2:first-of-type { margin-top: 0; }
+/* 사이드 표 — 메인 .metrics 보다 폰트 약간 작고 컴팩트 */
+.metrics--side { font-size: 7.8pt; }
+.metrics--side thead th { padding: 1.2mm 1.8mm; font-size: 7.2pt; }
+.metrics--side tbody td { padding: 1mm 1.8mm; }
+.metrics--side .metrics__note { font-size: 7.2pt; }
 .body h2 {
   margin: 4mm 0 1.5mm;
   font-size: 11pt;
@@ -266,7 +281,7 @@ body {
   display: block;
   width: 100%;
   height: auto;
-  max-height: 42mm;
+  max-height: 32mm;          /* 인사이트 아래로 내려와서 공간 빠듯 — 살짝 축소 */
   object-fit: contain;
 }
 .fig figcaption {
