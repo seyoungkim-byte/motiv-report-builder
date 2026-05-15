@@ -343,24 +343,15 @@ class CampaignRepository:
 
 
 def _short_note(md: MetricDef, row: dict[str, Any]) -> str:
-    """Note rendered under the metric value in the table.
+    """Note = 지표 의미 한 줄 (raw 절대값 표시 금지).
 
-    For multi-view metrics, we surface motiv vs market values with **each
-    view's own format** (so 명/% 단위가 자연스럽게 따라옴). For single-value
-    metrics, fall back to a trimmed description."""
-    if md.is_multi_view:
-        motiv_v  = md.views.get("motiv")
-        market_v = md.views.get("market")
-        if motiv_v and market_v:
-            mv = resolve_value(motiv_v, row)
-            tv = resolve_value(market_v, row)
-            if mv is not None and tv is not None:
-                m_fmt = format_value(mv, motiv_v.format_spec  or md.format_spec)
-                t_fmt = format_value(tv, market_v.format_spec or md.format_spec)
-                return f"광고노출자 {m_fmt} / 시장 {t_fmt}"
+    사용자 결정: 비고 자리에는 광고노출자/시장 절대 카운트 안 넣음.
+    카탈로그의 description 첫 문장만 컴팩트하게 노출."""
     if md.description:
-        d = md.description.split(".")[0]
-        return d[:60]
+        # description 첫 마침표까지, 없으면 60자
+        first = md.description.split(".")[0].strip()
+        if first:
+            return first[:80]
     return ""
 
 
