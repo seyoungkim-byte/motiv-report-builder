@@ -250,13 +250,15 @@ body {
 /* ─── Inline charts ──────────────────────────────────── */
 .figs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 14px;
   margin: 8px 0 14px;
+  grid-template-columns: 1fr 1fr;
 }
-.figs:has(> .fig:only-child) {
-  grid-template-columns: 1fr;
-}
+.figs--1 { grid-template-columns: 1fr; }
+.figs--2 { grid-template-columns: 1fr 1fr; }
+.figs--3 { grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.figs--3 .fig img { max-height: 200px; }
+.figs--3 .fig__title { font-size: 12.5px; }
 .fig {
   margin: 0;
   background: var(--paper);

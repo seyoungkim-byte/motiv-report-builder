@@ -155,7 +155,7 @@
 
     {% set all_charts = (charts.performance or []) + ([charts.inline_strategy] if charts.inline_strategy else []) %}
     {% if all_charts %}
-    <div class="figs">
+    <div class="figs figs--{{ all_charts|length }}">
       {% for ch in all_charts %}
       <figure class="fig">
         <div class="fig__head">

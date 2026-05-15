@@ -618,7 +618,7 @@ with col_r:
                 except Exception as e:
                     st.warning(f"후보 '{spec.get('title')}' 렌더 실패: {e}")
             st.session_state.chart_candidates = previews
-            # 기본 선택: 상위 2개 자동 체크
+            # 기본 선택: 상위 2개 자동 체크 (사용자가 원하면 3개까지 수동 가능)
             st.session_state.chart_selected = set(range(min(2, len(previews))))
             if not previews:
                 st.warning(
@@ -655,20 +655,116 @@ with col_r:
                 if c.get("caption"):
                     st.caption(c["caption"])
                 st.markdown("---")
-        # 2개 캡 강제 — 사용자가 3개 이상 체크하면 나중 것 cut
-        if len(selected) > 2:
-            selected = set(sorted(selected)[:2])
-            st.warning("⚠️ 최대 2개까지만 빌드에 포함됩니다. 나머지는 자동 해제됨.")
+        # 3개 캡 강제 — 4개 이상 체크 시 나중 것 cut
+        if len(selected) > 3:
+            selected = set(sorted(selected)[:3])
+            st.warning("⚠️ 최대 3개까지만 빌드에 포함됩니다. 나머지는 자동 해제됨.")
         st.session_state.chart_selected = selected
-        st.success(
-            f"✅ {len(selected)}/2 개 선택됨" if selected else
-            "체크된 후보가 없습니다 — 빌드 시 AI 자동 픽으로 폴백."
-        )
+        if selected:
+            note = (
+                f"✅ {len(selected)}/3 개 선택됨"
+                + (" (3개 시 가로 3열로 압축됨)" if len(selected) >= 3 else "")
+            )
+            st.success(note)
+        else:
+            st.info("체크된 후보가 없습니다 — 빌드 시 AI 자동 픽으로 폴백.")
 
     st.divider()
     st.subheader("7. 산출물 생성")
     out_dir: Path = settings.output_dir / campaign.campaign_no
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    # ── 1페이지 충만도 사전 체크 ─────────────────────────
+    # PDF 빌드 후 잘림을 막기 위해 빌드 직전에 길이 휴리스틱으로 위험 신호를
+    # 노출. A4 가용 ~278mm 중 헤더/푸터/KPI/2단grid 가 ~190mm 차지하니
+    # 본문 + 인사이트 + 차트가 들어갈 여유는 약 88mm. 거기 기준으로 추정.
+    def _estimate_overflow() -> tuple[int, list[str], int]:
+        """returns (risk_score, warnings, est_fill_percent 0~150+)"""
+        nar = st.session_state.narrative or {}
+        warns: list[str] = []
+        score = 0
+
+        def n(x):  # str length or sum of list-str lengths
+            if isinstance(x, list):
+                return sum(len(str(s)) for s in x)
+            return len(str(x or ""))
+
+        summary_chars = n(nar.get("summary"))
+        if summary_chars > 200:
+            warns.append(f"요약 {summary_chars}자 → 150자 이하 권장")
+            score += 1
+
+        ov = n(nar.get("overview"))
+        if ov > 200:
+            warns.append(f"01 캠페인 개요 {ov}자 → 불릿 더 짧게 (총 ≤170자)")
+            score += 1
+        bg = n(nar.get("background"))
+        if bg > 200:
+            warns.append(f"02 광고 집행 배경 {bg}자 → 불릿 더 짧게 (총 ≤170자)")
+            score += 1
+        st_chars = n(nar.get("strategy"))
+        if st_chars > 250:
+            warns.append(f"03 적용 전략 {st_chars}자 → 200자 이하 권장")
+            score += 1
+
+        ins_total = n(nar.get("insights"))
+        ins_count = len(nar.get("insights") or [])
+        if ins_total > 320:
+            warns.append(f"인사이트 합계 {ins_total}자 → 270자 이하 권장 (각 ~90자)")
+            score += 1
+        if ins_count > 3:
+            warns.append(f"인사이트 {ins_count}개 → 3개 권장")
+            score += 1
+
+        df_now = st.session_state.metrics_df
+        n_rows = len(df_now) if df_now is not None else 0
+        if n_rows > 7:
+            warns.append(f"04 성과 지표 {n_rows}행 → 7행 이하 권장 (우측 표가 본문보다 너무 길어짐)")
+            score += 1
+
+        n_charts = len(st.session_state.get("chart_selected") or set())
+        if n_charts == 0:
+            # 자동 픽 fallback — 보통 2개. 충만도 추정에 2개 가정
+            est_charts = 2
+        else:
+            est_charts = n_charts
+        if est_charts >= 3 and (ins_total > 250 or n_rows > 6):
+            warns.append(f"차트 3개 + 인사이트/성과표가 길어 잘림 위험")
+            score += 1
+
+        # 거친 fill % 계산 (모든 본문 + 차트 영역의 mm 합 ÷ 가용)
+        # 라인당 ~5.5mm, 본문 width ~85mm 기준 한 줄 ~45자
+        def lines(chars: int, w: int = 45) -> float:
+            return max(1, chars / w + 0.4)
+        body_left_mm = (
+            lines(summary_chars) * 5 +
+            lines(ov, 40) * 4.5 +
+            lines(bg, 40) * 4.5 +
+            lines(st_chars, 40) * 4.5
+        )
+        side_table_mm = 12 + n_rows * 7
+        body_grid_mm = max(body_left_mm, side_table_mm) + 18  # 헤더들
+        insights_mm = 12 + ins_count * 11 + (ins_total / 60) * 2
+        charts_mm   = (32 if est_charts <= 2 else 28) + 8
+        fixed_mm    = 110  # 헤더띠+타이틀+메타+태그+TL;DR+KPI+요약+푸터 합
+        total_mm    = fixed_mm + body_grid_mm + insights_mm + charts_mm
+        available_mm = 281
+        fill = int(total_mm / available_mm * 100)
+        return score, warns, fill
+
+    _score, _warns, _fill = _estimate_overflow()
+    if _fill >= 105 or _score >= 3:
+        st.error(
+            f"⚠️ 페이지 넘침 위험 — 예상 충만도 **{_fill}%** · 위험 신호 {_score}개"
+        )
+        for w in _warns:
+            st.caption(f"  • {w}")
+    elif _fill >= 95 or _score >= 1:
+        st.warning(f"💡 1페이지 거의 채움 — 예상 충만도 **{_fill}%** · 권장 사항 {_score}건")
+        for w in _warns:
+            st.caption(f"  • {w}")
+    else:
+        st.success(f"✅ 1페이지 여유 — 예상 충만도 {_fill}%")
 
     # 같은 캠페인의 저장된 빌드가 이미 있으면 버튼은 '재생성' 으로 라벨 변경.
     _has_saved_build = bool(

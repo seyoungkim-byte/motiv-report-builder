@@ -241,14 +241,16 @@ body {
 /* ─── Charts inline with paragraphs ─────────────────── */
 .figs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 3mm;
   margin: 1.5mm 0 2.5mm;
+  grid-template-columns: 1fr 1fr;  /* default 2 */
 }
-.figs:has(> .fig:only-child) {
-  /* single chart spans full width when only one */
-  grid-template-columns: 1fr;
-}
+.figs--1 { grid-template-columns: 1fr; }
+.figs--2 { grid-template-columns: 1fr 1fr; }
+.figs--3 { grid-template-columns: 1fr 1fr 1fr; gap: 2.5mm; }
+.figs--3 .fig img { max-height: 28mm; }  /* 3-col narrower → 더 작게 */
+.figs--3 .fig figcaption { font-size: 7pt; }
+.figs--3 .fig__title { font-size: 8.4pt; }
 .fig {
   margin: 0;
   background: #ffffff;

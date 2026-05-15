@@ -138,8 +138,9 @@ charts: list. 각 항목:
    나쁜 예: narrative.insights[0] 의 문장 첫 절을 그대로 따옴
 
 [제약]
-- performance ≤ 2, inline_strategy ≤ 1.
-- 차트 총 0~2개 (3개는 1페이지에 안 들어감).
+- performance ≤ 3, inline_strategy ≤ 1.
+- 차트 총 0~3개. 3개일 때는 가로 3열로 좁게 들어가니 단순한 차트
+  (bar_horizontal / index_lift) 위주로. 텍스트 라벨 많은 donut/funnel 은 2개 이하 권장.
 - 데이터가 부족하면 빈 리스트 반환: {"charts": []}.
 - 코드펜스·설명·머리말 금지. JSON 만.
 """
@@ -375,7 +376,7 @@ def _validate(items: list[Any]) -> list[dict[str, Any]]:
             continue
         # enforce placement quotas
         if plc == "performance":
-            if perf_count >= 2:
+            if perf_count >= 3:
                 continue
             perf_count += 1
         else:
@@ -390,8 +391,8 @@ def _validate(items: list[Any]) -> list[dict[str, Any]]:
             "caption":  str(item.get("caption") or ""),
             "data":     data,
         })
-        if len(out) >= 2:
-            break       # hard cap — 1-col layout can't fit a 3rd chart
+        if len(out) >= 3:
+            break       # hard cap — 페이지 폭 한계로 4번째는 못 들어감
     return out
 
 
