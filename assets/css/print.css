@@ -55,6 +55,55 @@ body {
   font-weight: 600;
   line-height: 1.4;
 }
+
+/* ── 캠페인 운영 개요 (헤더 메타) ── reference 디자인의 점·라벨·값 행
+   을 올리브 톤으로 흡수. 행 + 태그 칩 두 줄. */
+.hdr-meta {
+  margin: 1.5mm 0 0;
+  padding: 1.8mm 0 0;
+  border-top: 0.2mm dashed #e5dfd0;
+}
+.hdr-meta__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1mm 5mm;
+  margin-bottom: 1.5mm;
+}
+.hdr-meta__item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1.2mm;
+  font-size: 8pt;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.hdr-meta__dot {
+  display: inline-block;
+  width: 1.2mm; height: 1.2mm;
+  border-radius: 50%;
+  background: #c9a961;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.hdr-meta__label { color: #6b6f63; font-weight: 500; }
+.hdr-meta__value { color: #1d1f1a; font-weight: 600; }
+
+.hdr-meta__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2mm;
+  margin-top: 1mm;
+}
+.hdr-meta__chip {
+  font-size: 7pt;
+  font-weight: 700;
+  letter-spacing: .02em;
+  padding: 0.8mm 1.8mm;
+  border: 0.2mm solid #c9a961;
+  color: #4e5a2d;
+  background: #fdfbf4;
+  border-radius: 1mm;
+}
 .tldr {
   margin: 1.5mm 0 0;
   padding: 0;

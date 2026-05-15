@@ -72,6 +72,52 @@ body {
   font-weight: 600;
   line-height: 1.45;
 }
+
+/* ── 캠페인 운영 개요 (헤더 메타) ── */
+.hdr-meta {
+  margin: 12px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px dashed var(--line);
+}
+.hdr-meta__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  margin-bottom: 10px;
+}
+.hdr-meta__item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.hdr-meta__dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--gold);
+  flex-shrink: 0;
+}
+.hdr-meta__label { color: var(--muted); font-weight: 500; }
+.hdr-meta__value { color: var(--ink); font-weight: 600; }
+
+.hdr-meta__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.hdr-meta__chip {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  padding: 3px 10px;
+  border: 1px solid var(--gold);
+  color: var(--olive-dark);
+  background: var(--gold-soft);
+  border-radius: 4px;
+}
 .tldr {
   margin: 12px 0 0;
   padding: 0;

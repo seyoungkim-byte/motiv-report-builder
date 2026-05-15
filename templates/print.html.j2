@@ -23,6 +23,52 @@
   <section class="title-block">
     <h1 class="title-block__h1">{{ headline }}</h1>
     {% if subhead %}<p class="title-block__sub">{{ subhead }}</p>{% endif %}
+
+    {# ── 캠페인 운영 개요 (헤더 메타 행 + 태그 칩) ── #}
+    {% set hm = header_meta or {} %}
+    {% if hm %}
+    <div class="hdr-meta">
+      <div class="hdr-meta__row">
+        {% if hm.advertiser %}
+        <span class="hdr-meta__item">
+          <span class="hdr-meta__dot"></span>
+          <span class="hdr-meta__label">광고주</span>
+          <span class="hdr-meta__value">{{ hm.advertiser }}</span>
+        </span>
+        {% endif %}
+        {% if hm.period_start %}
+        <span class="hdr-meta__item">
+          <span class="hdr-meta__dot"></span>
+          <span class="hdr-meta__label">집행 기간</span>
+          <span class="hdr-meta__value">
+            {{ hm.period_start }}{% if hm.period_end %} ~ {{ hm.period_end }}{% endif %}
+            {% if hm.cumulative_period %} · {{ hm.cumulative_period }}{% endif %}
+          </span>
+        </span>
+        {% endif %}
+        {% if hm.media_products %}
+        <span class="hdr-meta__item">
+          <span class="hdr-meta__dot"></span>
+          <span class="hdr-meta__label">집행 상품</span>
+          <span class="hdr-meta__value">{{ hm.media_products }}</span>
+        </span>
+        {% endif %}
+        {% if hm.measurement_source %}
+        <span class="hdr-meta__item">
+          <span class="hdr-meta__dot"></span>
+          <span class="hdr-meta__label">구매 측정</span>
+          <span class="hdr-meta__value">{{ hm.measurement_source }}</span>
+        </span>
+        {% endif %}
+      </div>
+      {% if hm.tags %}
+      <div class="hdr-meta__tags">
+        {% for tag in hm.tags %}<span class="hdr-meta__chip">{{ tag }}</span>{% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
     {% if narrative.tldr %}
     <ul class="tldr">
       {% for item in narrative.tldr %}
