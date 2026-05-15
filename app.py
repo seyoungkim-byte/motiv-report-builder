@@ -193,9 +193,9 @@ def _reset_campaign_state(data: CampaignData):
         st.session_state["nar_insights"] = "\n".join(nar.get(INSIGHTS_KEY, []))
         st.session_state["nar_tldr"] = "\n".join(nar.get(TLDR_KEY, []))
 
-    saved_metrics = src.get("metrics_table") or []
-    if saved_metrics:
-        st.session_state.metrics_df = pd.DataFrame(saved_metrics)
+    # metrics_table 은 saved build 에서 복원하지 않음 — 카탈로그가 캐논이라
+    # 옛 라벨/값이 그대로 살아남으면 정합성 깨짐. 위에서 이미 fresh
+    # catalog 기반으로 metrics_df 가 채워졌음.
 
     # Header 메타 복원 (옛 빌드는 header_meta 없을 수 있음 — setdefault 처리)
     hm = src.get("header_meta") or {}
@@ -457,22 +457,63 @@ with col_l:
 
 with col_r:
     st.subheader("4. 성과 지표 (04. 캠페인 성과)")
-    st.caption("레퍼런스 포맷: 성과 지표 · 성과 · 비고 (3열)")
+    st.caption(
+        "레퍼런스 포맷: 성과 지표 · 성과 · 비고 (3열). "
+        "좌측 ☑ 체크 후 ▲▼ 로 행 이동."
+    )
     base_df = st.session_state.metrics_df if st.session_state.metrics_df is not None else pd.DataFrame(
         columns=["indicator", "value", "note"]
     )
+    # 행 이동용 선택 컬럼 보장
+    if "_select" not in base_df.columns:
+        base_df = base_df.assign(_select=False)
+    # data_editor 에 들어가기 직전에 항상 첫 컬럼이 _select 가 되도록 정렬
     edited = st.data_editor(
         base_df,
         num_rows="dynamic",
         width="stretch",
         column_config={
+            "_select":   st.column_config.CheckboxColumn("↕", width="small",
+                            help="체크 후 아래 ▲▼ 로 행 이동"),
             "indicator": st.column_config.TextColumn("성과 지표"),
-            "value": st.column_config.TextColumn("성과"),
-            "note": st.column_config.TextColumn("비고"),
+            "value":     st.column_config.TextColumn("성과"),
+            "note":      st.column_config.TextColumn("비고"),
         },
+        column_order=["_select", "indicator", "value", "note"],
         key="metrics_editor",
     )
     st.session_state.metrics_df = edited
+
+    # ── 행 이동 컨트롤 ──────────────────────
+    def _shift_metric_row(direction: int):
+        """direction=-1 (위) / +1 (아래). 체크된 첫 행만 이동."""
+        df_now = st.session_state.metrics_df
+        if df_now is None or df_now.empty or "_select" not in df_now.columns:
+            return
+        sel = df_now.index[df_now["_select"] == True].tolist()
+        if not sel:
+            return
+        i = sel[0]
+        j = i + direction
+        if j < 0 or j >= len(df_now):
+            return
+        new_idx = df_now.index.tolist()
+        new_idx[i], new_idx[j] = new_idx[j], new_idx[i]
+        new_df = df_now.loc[new_idx].reset_index(drop=True)
+        # 이동 후 체크박스는 새 위치의 행에 유지
+        new_df["_select"] = False
+        new_df.at[j, "_select"] = True
+        st.session_state.metrics_df = new_df
+        # data_editor 의 내부 상태 리셋해야 새 순서 반영됨
+        if "metrics_editor" in st.session_state:
+            del st.session_state["metrics_editor"]
+        st.rerun()
+
+    bcols = st.columns([0.18, 0.18, 0.64])
+    if bcols[0].button("▲ 위로", width="stretch", key="metric_up"):
+        _shift_metric_row(-1)
+    if bcols[1].button("▼ 아래로", width="stretch", key="metric_down"):
+        _shift_metric_row(+1)
 
     st.subheader("5. 히어로 이미지")
     tab_ai, tab_upload = st.tabs(["AI 생성 (Gemini)", "직접 업로드"])
@@ -777,7 +818,7 @@ with col_r:
             subhead=st.session_state.subhead,
             context_prose=st.session_state.context_prose,
             narrative=st.session_state.narrative,
-            metrics_table=df.to_dict(orient="records"),
+            metrics_table=df.drop(columns=["_select"], errors="ignore").to_dict(orient="records"),
             header_meta=header_meta_to_save,
             hero_image=hero_bytes,
             html=html_bytes,
