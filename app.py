@@ -140,9 +140,14 @@ def _reset_campaign_state(data: CampaignData):
     """Clear all per-campaign UI state so the new selection starts fresh."""
     st.session_state.campaign = data
     st.session_state.last_no = data.campaign_no
-    st.session_state.metrics_df = pd.DataFrame(
+    # _select 컬럼을 처음부터 박아둬 data_editor 의 내부 캐시 식별자와 어긋나지 않게.
+    # (이전에는 매 render 마다 .assign(_select=False) 로 새 DF 를 만들어 editor 가
+    # 한 rerun 늦게 반영되는 lag 발생.)
+    _df = pd.DataFrame(
         [{"indicator": m.indicator, "value": m.value, "note": m.note} for m in data.metrics_table]
     )
+    _df["_select"] = False
+    st.session_state.metrics_df = _df
     st.session_state.narrative = (
         {k: "" for k, _ in NARRATIVE_SECTIONS} | {INSIGHTS_KEY: [], TLDR_KEY: []}
     )
@@ -490,15 +495,17 @@ with col_r:
         "레퍼런스 포맷: 성과 지표 · 성과 · 비고 (3열). "
         "좌측 ☑ 체크 후 ▲▼ 로 행 이동."
     )
-    base_df = st.session_state.metrics_df if st.session_state.metrics_df is not None else pd.DataFrame(
-        columns=["indicator", "value", "note"]
-    )
-    # 행 이동용 선택 컬럼 보장
-    if "_select" not in base_df.columns:
-        base_df = base_df.assign(_select=False)
-    # data_editor 에 들어가기 직전에 항상 첫 컬럼이 _select 가 되도록 정렬
+    # _select 컬럼은 _reset_campaign_state 에서 이미 세팅. None 상태일 때만 빈 DF.
+    if st.session_state.metrics_df is None:
+        st.session_state.metrics_df = pd.DataFrame(
+            columns=["indicator", "value", "note", "_select"]
+        )
+    elif "_select" not in st.session_state.metrics_df.columns:
+        # 옛 빌드에서 넘어온 경우 in-place 추가 (identity 보존)
+        st.session_state.metrics_df["_select"] = False
+
     edited = st.data_editor(
-        base_df,
+        st.session_state.metrics_df,
         num_rows="dynamic",
         width="stretch",
         column_config={
@@ -511,7 +518,8 @@ with col_r:
         column_order=["_select", "indicator", "value", "note"],
         key="metrics_editor",
     )
-    st.session_state.metrics_df = edited
+    # .copy() 로 aliasing 끊기 — Streamlit data_editor 내부 캐시와 분리
+    st.session_state.metrics_df = edited.copy()
 
     # ── 행 이동 컨트롤 ──────────────────────
     def _shift_metric_row(direction: int):
