@@ -82,9 +82,10 @@
     {% endif %}
   </section>
 
-  {% if campaign.metrics_table %}
+  {% set _kpi_list = kpi_table if kpi_table else (campaign.metrics_table[:4] if campaign.metrics_table else []) %}
+  {% if _kpi_list %}
   <section class="kpis" aria-label="핵심 지표">
-    {% for m in campaign.metrics_table[:4] %}
+    {% for m in _kpi_list[:4] %}
     <div class="kpi">
       <span class="kpi__label">{{ m.indicator }}</span>
       <span class="kpi__value">{{ m.value }}</span>

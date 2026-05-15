@@ -147,6 +147,10 @@ def _reset_campaign_state(data: CampaignData):
         [{"indicator": m.indicator, "value": m.value, "note": m.note} for m in data.metrics_table]
     )
     _df["_select"] = False
+    # 기본 상단 KPI 카드 = 첫 4행 (사용자가 체크박스로 재선택 가능, 최대 4)
+    _df["_kpi"]    = [i < 4 for i in range(len(_df))]
+    # 기본 04 표 = 전체 노출 (사용자가 빼고 싶으면 체크 해제)
+    _df["_table"]  = True
     st.session_state.metrics_df = _df
     st.session_state.narrative = (
         {k: "" for k, _ in NARRATIVE_SECTIONS} | {INSIGHTS_KEY: [], TLDR_KEY: []}
@@ -495,31 +499,47 @@ with col_r:
         "레퍼런스 포맷: 성과 지표 · 성과 · 비고 (3열). "
         "좌측 ☑ 체크 후 ▲▼ 로 행 이동."
     )
-    # _select 컬럼은 _reset_campaign_state 에서 이미 세팅. None 상태일 때만 빈 DF.
+    # 컬럼 보장 — 옛 세션에서 넘어온 경우 in-place 추가 (identity 보존)
     if st.session_state.metrics_df is None:
         st.session_state.metrics_df = pd.DataFrame(
-            columns=["indicator", "value", "note", "_select"]
+            columns=["indicator", "value", "note", "_select", "_kpi", "_table"]
         )
-    elif "_select" not in st.session_state.metrics_df.columns:
-        # 옛 빌드에서 넘어온 경우 in-place 추가 (identity 보존)
-        st.session_state.metrics_df["_select"] = False
+    else:
+        df_cur = st.session_state.metrics_df
+        if "_select" not in df_cur.columns:
+            df_cur["_select"] = False
+        if "_kpi" not in df_cur.columns:
+            df_cur["_kpi"] = [i < 4 for i in range(len(df_cur))]
+        if "_table" not in df_cur.columns:
+            df_cur["_table"] = True
 
     edited = st.data_editor(
         st.session_state.metrics_df,
         num_rows="dynamic",
         width="stretch",
         column_config={
-            "_select":   st.column_config.CheckboxColumn("↕", width="small",
+            "_select":   st.column_config.CheckboxColumn("↕",  width="small",
                             help="체크 후 아래 ▲▼ 로 행 이동"),
+            "_kpi":      st.column_config.CheckboxColumn("KPI", width="small",
+                            help="상단 4-카드 KPI 스트립 노출. 최대 4개. 체크된 행 순서대로."),
+            "_table":    st.column_config.CheckboxColumn("표",  width="small",
+                            help="04 캠페인 성과 표 노출. 체크된 행 순서대로."),
             "indicator": st.column_config.TextColumn("성과 지표"),
             "value":     st.column_config.TextColumn("성과"),
             "note":      st.column_config.TextColumn("비고"),
         },
-        column_order=["_select", "indicator", "value", "note"],
+        column_order=["_select", "_kpi", "_table", "indicator", "value", "note"],
         key="metrics_editor",
     )
-    # .copy() 로 aliasing 끊기 — Streamlit data_editor 내부 캐시와 분리
     st.session_state.metrics_df = edited.copy()
+
+    # _kpi 가 5개 이상 체크되면 처음 4개만 활성, 나머지는 자동 해제
+    _kpi_idxs = list(edited.index[edited["_kpi"] == True])
+    if len(_kpi_idxs) > 4:
+        st.warning("⚠️ KPI 카드는 최대 4개까지. 나머지는 자동 해제됩니다.")
+        for idx in _kpi_idxs[4:]:
+            st.session_state.metrics_df.at[idx, "_kpi"] = False
+        edited = st.session_state.metrics_df
 
     # ── 행 이동 컨트롤 ──────────────────────
     def _shift_metric_row(direction: int):
@@ -795,19 +815,31 @@ with col_r:
                 "(또는 각 textarea에 직접 입력)"
             )
             st.stop()
-        # materialize the edited metrics back into the campaign payload
+        # materialize the edited metrics back into the campaign payload.
+        # _kpi / _table 체크박스 분리 — 상단 KPI 스트립과 04 표가 서로 다른
+        # 부분집합/순서를 가질 수 있게.
         df = st.session_state.metrics_df
         if df is None:
             df = pd.DataFrame(columns=["indicator", "value", "note"])
-        campaign.metrics_table = [
-            MetricRow(
+        all_records = df.to_dict(orient="records")
+        valid_records = [
+            r for r in all_records
+            if str(r.get("indicator", "")).strip() and str(r.get("value", "")).strip()
+        ]
+        def _to_row(r):
+            return MetricRow(
                 indicator=str(r.get("indicator", "")).strip(),
                 value=str(r.get("value", "")).strip(),
                 note=str(r.get("note", "")).strip(),
             )
-            for r in df.to_dict(orient="records")
-            if str(r.get("indicator", "")).strip() and str(r.get("value", "")).strip()
-        ]
+        # 04 표 = _table 체크된 행 (옛 빌드 호환: 컬럼 없으면 모두 포함)
+        table_records = [r for r in valid_records if r.get("_table", True)]
+        campaign.metrics_table = [_to_row(r) for r in table_records]
+        # KPI 스트립 = _kpi 체크된 행 (옛 빌드 호환: 컬럼 없으면 첫 4행)
+        kpi_records = [r for r in valid_records if r.get("_kpi", False)][:4]
+        if not kpi_records:
+            kpi_records = valid_records[:4]
+        kpi_table_rows = [_to_row(r) for r in kpi_records]
 
         # Chart selection path — prefer user-curated candidates, fall back
         # to auto plan_charts() when the user hasn't run candidate mode.
@@ -894,6 +926,12 @@ with col_r:
             "narrative": st.session_state.narrative,
             "chart_set": chart_set,
             "header_meta": header_meta,
+            # KPI 스트립 전용 — 사용자가 _kpi 체크박스로 선택한 행만, 최대 4개.
+            # 04 표는 campaign.metrics_table 그대로 (이미 _table 필터 적용됨).
+            "kpi_table": [
+                {"indicator": r.indicator, "value": r.value, "note": r.note}
+                for r in kpi_table_rows
+            ],
             "hero_image_url": Path(st.session_state.hero_path).as_uri()
             if st.session_state.hero_path
             else None,
