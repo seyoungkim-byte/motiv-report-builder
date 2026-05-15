@@ -246,6 +246,7 @@ def plan_charts(
     narrative: dict[str, Any],
     *,
     campaign_context_prose: str = "",
+    extra_analysis: str = "",
     debug: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Ask Claude to pick 0~3 charts. Returns list of validated specs.
@@ -290,9 +291,17 @@ def plan_charts(
     prose_block = (
         "[캠페인 컨텍스트 — 1차 사실]\n" + (prose_clean or "(없음)")
     )
+    extra_clean = (extra_analysis or "").strip()
+    extra_block = (
+        "[추가 분석 데이터 — 1차 사실 (사용자 수기). 표·수치 포함 가능]\n"
+        + extra_clean
+        + "\n(여기 표 / 수치가 있으면 그것을 기반으로 차트 후보를 최우선으로 만드세요. "
+          "DB 메트릭만으로는 만들 수 없는 비교 (예: 경쟁사 점유율) 가 여기 있을 수 있음.)"
+        if extra_clean else "[추가 분석 데이터]\n(없음)"
+    )
 
     user_text = (
-        f"{catalog_block}\n\n{db_block}\n\n{pairs_block}\n\n{nar_block}\n\n{prose_block}\n\n"
+        f"{catalog_block}\n\n{db_block}\n\n{pairs_block}\n\n{extra_block}\n\n{nar_block}\n\n{prose_block}\n\n"
         "[지시] 위 [원칙]에 따라 0~3개 차트를 선택해 JSON으로 반환하세요."
         f"{JSON_RETURN_HINT}"
     )
@@ -440,6 +449,7 @@ def plan_chart_candidates(
     narrative: dict[str, Any],
     *,
     campaign_context_prose: str = "",
+    extra_analysis: str = "",
     user_instruction: str = "",
     debug: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
@@ -470,6 +480,13 @@ def plan_chart_candidates(
     nar_block   = "[내러티브 초안]\n" + json.dumps(narrative, ensure_ascii=False, indent=2)
     prose_clean = (campaign_context_prose or "").strip()
     prose_block = "[캠페인 컨텍스트 — 1차 사실]\n" + (prose_clean or "(없음)")
+    extra_clean = (extra_analysis or "").strip()
+    extra_block = (
+        "[추가 분석 데이터 — 1차 사실 (사용자 수기, 표·수치 포함 가능)]\n"
+        + extra_clean
+        + "\n(여기 표 / 수치가 있으면 그것을 1순위 후보로. 4~5개 후보 중 최소 1개는 이 데이터에서 도출.)"
+        if extra_clean else "[추가 분석 데이터]\n(없음)"
+    )
     instr_clean = (user_instruction or "").strip()
     instr_block = (
         "\n\n[사용자 지시 — 절대 따라야 함]\n" + instr_clean
@@ -477,10 +494,11 @@ def plan_chart_candidates(
     )
 
     user_text = (
-        f"{catalog_block}\n\n{db_block}\n\n{pairs_block}\n\n{nar_block}\n\n{prose_block}{instr_block}\n\n"
+        f"{catalog_block}\n\n{db_block}\n\n{pairs_block}\n\n{extra_block}\n\n{nar_block}\n\n{prose_block}{instr_block}\n\n"
         "[지시] 다양한 각도의 차트 후보 4~5개를 JSON 으로 반환하세요. "
         "메트릭 카탈로그가 있으면 그 메트릭의 display_name 을 차트 제목에 그대로 사용. "
-        "다중 view 메트릭은 bar_vertical_pair (market vs motiv) 와 index_lift (relative) 둘 다 후보로 제시 가능."
+        "다중 view 메트릭은 bar_vertical_pair (market vs motiv) 와 index_lift (relative) 둘 다 후보로 제시 가능. "
+        "추가 분석 데이터 (표) 가 있으면 최소 1개 후보는 그 데이터에서."
         f"{JSON_RETURN_HINT}"
     )
 

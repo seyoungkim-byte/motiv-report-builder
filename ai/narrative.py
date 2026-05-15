@@ -138,6 +138,7 @@ def generate_narrative(
     campaign_payload: dict[str, Any],
     *,
     campaign_context_prose: str = "",
+    extra_analysis: str = "",
 ) -> dict[str, Any]:
     """Generate the 5-section narrative draft.
 
@@ -152,19 +153,27 @@ def generate_narrative(
     )
 
     prose_clean = (campaign_context_prose or "").strip()
+    extra_clean = (extra_analysis or "").strip()
+
+    parts: list[str] = []
     if prose_clean:
-        prose_text = (
-            "[캠페인 컨텍스트 — 1차 사실]\n"
-            + prose_clean
-            + "\n\n[지시] 위 [작성 규칙]에 따라 5개 섹션 JSON을 작성하세요."
-        )
+        parts.append("[캠페인 컨텍스트 — 1차 사실]\n" + prose_clean)
     else:
-        prose_text = (
+        parts.append(
             "[캠페인 컨텍스트 — 1차 사실]\n"
             "(사용자가 작성하지 않음 — [DB 보조 데이터]를 사실의 기준으로 사용하세요. "
-            "DB에 없는 부분은 추측 금지, 빈 문자열로 둡니다.)\n\n"
-            "[지시] 위 [작성 규칙]에 따라 5개 섹션 JSON을 작성하세요."
+            "DB에 없는 부분은 추측 금지, 빈 문자열로 둡니다.)"
         )
+    if extra_clean:
+        parts.append(
+            "[추가 분석 데이터 — 1차 사실 (사용자 수기 입력)]\n"
+            + extra_clean
+            + "\n(여기 들어있는 표·수치·발견은 DB 데이터와 동일한 권위로 다룹니다. "
+              "요약·인사이트에 자연스럽게 통합해 본문 흐름의 일부로 인용하세요. "
+              "단, 실제 광고주/경쟁사 브랜드명은 그대로 노출하지 말고 익명 라벨로 치환.)"
+        )
+    parts.append("[지시] 위 [작성 규칙]에 따라 6개 필드 (tldr/summary/overview/background/strategy/insights) JSON 을 작성하세요.")
+    prose_text = "\n\n".join(parts)
 
     response = _client().messages.create(
         model=settings.anthropic_text_model,

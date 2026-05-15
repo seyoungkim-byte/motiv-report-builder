@@ -127,6 +127,7 @@ _session_default("hero_path", None)
 _session_default("headline", "")
 _session_default("subhead", "")
 _session_default("context_prose", "")
+_session_default("extra_analysis", "")
 # Header meta — user-supplied fields not in DB (집행 상품 / 구매 측정 / 태그 / 누적 기간)
 _session_default("hdr_media_products", "")
 _session_default("hdr_measurement", "")
@@ -150,6 +151,7 @@ def _reset_campaign_state(data: CampaignData):
     st.session_state["nar_insights"] = ""
     st.session_state["nar_tldr"] = ""
     st.session_state.context_prose = ""
+    st.session_state.extra_analysis = ""
     st.session_state.headline = ""
     st.session_state.subhead = ""
     st.session_state.hero_path = None
@@ -175,6 +177,7 @@ def _reset_campaign_state(data: CampaignData):
     st.session_state.headline = src.get("headline") or st.session_state.headline
     st.session_state.subhead = src.get("subhead") or ""
     st.session_state.context_prose = src.get("context_prose") or ""
+    st.session_state.extra_analysis = src.get("extra_analysis") or ""
     nar = src.get("narrative") or {}
     if nar:
         # Backfill missing keys so older builds don't blow up the widgets.
@@ -358,19 +361,45 @@ with col_l:
     st.text_area(
         "캠페인 컨텍스트 (자유 서술 — Claude가 1차 사실로 사용)",
         key="context_prose",
-        height=180,
+        height=160,
         help=(
             "예: 'OO 캠페인은 X를 목표로 Y 오디언스를 타게팅하여 Z 방식으로 운영했고, "
             "~ 같은 성과를 거두었다.' 여기 적은 내용이 DB 데이터보다 우선합니다. "
             "비워두면 DB만 사용합니다."
         ),
     )
+
+    # ── 추가 분석 데이터 — DB 외 보조 분석 자료 (시장 점유율/경쟁사 비교 등) ──
+    with st.expander("📊 추가 분석 데이터 (선택) — 표·수치 수기 입력", expanded=False):
+        st.caption(
+            "DB 에 없는 분석 자료 (시장 점유율, 경쟁사 비교, 외부 벤치마크 등) 를 "
+            "여기 붙여넣으면 **내러티브 + 차트 추천** 양쪽에 1차 사실로 반영됩니다. "
+            "CSV / 표 / 줄글 자유. 실 브랜드명은 자동 익명화됩니다."
+        )
+        st.text_area(
+            "추가 분석",
+            key="extra_analysis",
+            height=180,
+            placeholder=(
+                "예시:\n"
+                "## 시장 점유율 변화 (구매 건수 기준, 1월 → 2월)\n"
+                "브랜드,1월,2월\n"
+                "마즈,38.6,24.7\n"
+                "페레로,28.4,30.9\n"
+                "허쉬,13.8,23.7\n"
+                "린트,5.6,8.3\n"
+                "→ 핵심: 린트 M/S +46.8% 증가율 2위 (페레로 +8.9% 대비 5배 이상)"
+            ),
+            label_visibility="collapsed",
+        )
+
     if st.button("Claude로 섹션 초안 생성", type="primary"):
         with st.spinner("Claude 호출 중..."):
             try:
                 result = generate_narrative(
                     campaign.to_prompt_dict(),
                     campaign_context_prose=st.session_state.context_prose,
+                    extra_analysis=st.session_state.extra_analysis,
                 )
                 st.session_state.narrative = result
                 # Push generated values into the widget-bound keys so the
@@ -577,6 +606,7 @@ with col_r:
                 campaign.to_prompt_dict(),
                 st.session_state.narrative,
                 campaign_context_prose=st.session_state.context_prose,
+                extra_analysis=st.session_state.extra_analysis,
                 user_instruction=_instr,
                 debug=dbg,
             )
@@ -700,6 +730,7 @@ with col_r:
                         campaign.to_prompt_dict(),
                         st.session_state.narrative,
                         campaign_context_prose=st.session_state.context_prose,
+                        extra_analysis=st.session_state.extra_analysis,
                         debug=chart_debug,
                     )
                 for spec in planned:
@@ -817,6 +848,7 @@ with col_r:
             headline=st.session_state.headline,
             subhead=st.session_state.subhead,
             context_prose=st.session_state.context_prose,
+            extra_analysis=st.session_state.extra_analysis,
             narrative=st.session_state.narrative,
             metrics_table=df.drop(columns=["_select"], errors="ignore").to_dict(orient="records"),
             header_meta=header_meta_to_save,
