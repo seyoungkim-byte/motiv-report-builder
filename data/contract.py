@@ -70,5 +70,38 @@ class CampaignData:
             "targeting_summary": self.targeting_summary,
             "audience_insights": self.audience_insights,
             "creative_summary": self.creative_summary,
-            "extras": self.extras,
+            # extras 내부의 텍스트 컬럼 (view_row.campaign_name 등) 에 실 브랜드명이
+            # 그대로 박혀있어 AI 가 그걸 본문에 인용하던 문제를 막기 위해 마스킹.
+            "extras": _mask_extras(self.extras, masked),
         }
+
+
+# ── 모듈 함수 — extras 정리 ────────────────────────────────────
+_LEAKY_TEXT_KEYS = {
+    "campaign_name", "advertiser", "brand", "product",
+    "advertiser_name", "brand_name", "product_name",
+}
+
+
+def _mask_extras(extras: dict[str, Any], masked_label: str) -> dict[str, Any]:
+    """extras 안의 신원 노출 컬럼을 마스킹 라벨로 덮어씀.
+
+    `extras.view_row` 가 DB 의 전체 row 라 campaign_name 같은 텍스트 컬럼이
+    그대로 들어있다. 이를 그대로 AI 에 전달하면 system prompt 의 익명화
+    규칙이 있어도 AI 가 본문에 인용할 위험이 있어 prompt 진입 전에 1차 검열.
+    """
+    if not isinstance(extras, dict):
+        return {}
+    out: dict[str, Any] = {}
+    for k, v in extras.items():
+        if isinstance(v, dict):
+            cleaned = {}
+            for kk, vv in v.items():
+                if kk in _LEAKY_TEXT_KEYS and isinstance(vv, str) and vv.strip():
+                    cleaned[kk] = masked_label
+                else:
+                    cleaned[kk] = vv
+            out[k] = cleaned
+        else:
+            out[k] = v
+    return out
