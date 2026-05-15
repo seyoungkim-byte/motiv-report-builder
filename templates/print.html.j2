@@ -78,10 +78,11 @@
     {% endif %}
   </section>
 
-  {# ── KPI 스트립 ────────────────────────────────────────── #}
-  {% if campaign.metrics_table %}
+  {# ── KPI 스트립 — kpi_table (사용자 선택, ≤4) 우선, 없으면 metrics_table[:4] 폴백 #}
+  {% set _kpi_list = kpi_table if kpi_table else (campaign.metrics_table[:4] if campaign.metrics_table else []) %}
+  {% if _kpi_list %}
   <section class="kpis">
-    {% for m in campaign.metrics_table[:4] %}
+    {% for m in _kpi_list[:4] %}
     <div class="kpi">
       <span class="kpi__label">{{ m.indicator }}</span>
       <span class="kpi__value">{{ m.value }}</span>
