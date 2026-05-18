@@ -213,9 +213,21 @@ def _reset_campaign_state(data: CampaignData):
         st.session_state["nar_insights"] = "\n".join(nar.get(INSIGHTS_KEY, []))
         st.session_state["nar_tldr"] = "\n".join(nar.get(TLDR_KEY, []))
 
-    # metrics_table 은 saved build 에서 복원하지 않음 — 카탈로그가 캐논이라
-    # 옛 라벨/값이 그대로 살아남으면 정합성 깨짐. 위에서 이미 fresh
-    # catalog 기반으로 metrics_df 가 채워졌음.
+    # metrics_table 도 saved build 에서 복원 — 사용자가 수기로 편집한 indicator/
+    # value/note 와 _kpi/_table 체크 상태를 보존.
+    # 옛 빌드 (마이그레이션 이전 stale 라벨) 가 살아날 위험은 있지만, 사용자가
+    # 편집모드 안의 [🔄 카탈로그에서 새로고침] 으로 원하는 시점에 재설정 가능.
+    saved_metrics = src.get("metrics_table") or []
+    if saved_metrics:
+        saved_df = pd.DataFrame(saved_metrics)
+        # 컬럼 보장 — 옛 빌드는 _kpi/_table 없으니 기본값 자동 부착
+        if "_select" not in saved_df.columns:
+            saved_df["_select"] = False
+        if "_kpi" not in saved_df.columns:
+            saved_df["_kpi"] = [i < 4 for i in range(len(saved_df))]
+        if "_table" not in saved_df.columns:
+            saved_df["_table"] = True
+        st.session_state.metrics_df = saved_df
 
     # Header 메타 복원 (옛 빌드는 header_meta 없을 수 있음 — setdefault 처리)
     hm = src.get("header_meta") or {}
@@ -645,6 +657,25 @@ with col_r:
                 st.session_state.metrics_df = st.session_state.metrics_df_backup
             st.session_state.metrics_edit_mode = False
             st.session_state.metrics_df_backup = None
+            if "metrics_editor" in st.session_state:
+                del st.session_state["metrics_editor"]
+            st.rerun()
+
+        # 보조 액션 — 카탈로그에서 fresh 한 metrics 로 덮어쓰기.
+        # 옛 빌드의 stale 라벨 정리하거나 신규 카탈로그 메트릭 도입 시 사용.
+        # 편집 중에만 노출. 클릭 시 backup 은 보존 (취소로 되돌릴 수 있게).
+        st.caption(
+            "📚 카탈로그에서 새로 불러오기 — 기존 수기 편집이 모두 카탈로그 기본값으로 덮어집니다. "
+            "옛 빌드의 stale 라벨 정리 또는 카탈로그 신규 메트릭 추가 시 사용."
+        )
+        if st.button("🔄 카탈로그에서 새로고침 (수기 편집 폐기)", key="refresh_catalog", width="stretch"):
+            fresh_df = pd.DataFrame(
+                [{"indicator": m.indicator, "value": m.value, "note": m.note} for m in campaign.metrics_table]
+            )
+            fresh_df["_select"] = False
+            fresh_df["_kpi"]    = [i < 4 for i in range(len(fresh_df))]
+            fresh_df["_table"]  = True
+            st.session_state.metrics_df = fresh_df
             if "metrics_editor" in st.session_state:
                 del st.session_state["metrics_editor"]
             st.rerun()
