@@ -133,6 +133,11 @@ _session_default("hdr_media_products", "")
 _session_default("hdr_measurement", "")
 _session_default("hdr_tags_raw", "")            # 한 줄에 한 태그
 _session_default("hdr_cumulative_period", "")
+# 성과 지표 표 — 편집 모드 / 백업 (Streamlit data_editor 의 reactive 동기화
+# 문제를 피하려 명시적 편집 모드 도입. 편집 중에는 session_state 사후 수정
+# 안 함 → 저장 클릭 시에만 commit).
+_session_default("metrics_edit_mode", False)
+_session_default("metrics_df_backup", None)
 
 
 # ─────────────────────────────────────── Sidebar: campaign picker
@@ -174,6 +179,9 @@ def _reset_campaign_state(data: CampaignData):
     st.session_state.hdr_measurement = ""
     st.session_state.hdr_tags_raw = ""
     st.session_state.hdr_cumulative_period = ""
+    # 편집 모드/백업 리셋 — 새 캠페인 들어오면 자동 표시 모드로
+    st.session_state.metrics_edit_mode = False
+    st.session_state.metrics_df_backup = None
     if "metrics_editor" in st.session_state:
         del st.session_state["metrics_editor"]
 
@@ -494,12 +502,41 @@ with col_l:
     ]
 
 with col_r:
-    st.subheader("4. 성과 지표 (04. 캠페인 성과)")
-    st.caption(
-        "레퍼런스 포맷: 성과 지표 · 성과 · 비고 (3열). "
-        "좌측 ☑ 체크 후 ▲▼ 로 행 이동."
-    )
-    # 컬럼 보장 — 옛 세션에서 넘어온 경우 in-place 추가 (identity 보존)
+    # ── 4. 성과 지표 — 표시 모드 / 편집 모드 토글 ──────────────
+    # data_editor 의 reactive 동기화 문제(셀 입력 lag · 새 행 사라짐)를
+    # 회피하기 위해 명시적 편집 모드 도입. 표시 모드에서는 st.dataframe
+    # 으로 read-only 노출, 편집 모드에서만 data_editor 가 활성화되고
+    # 저장 클릭 시 일괄 commit.
+    _c_title, _c_btn = st.columns([0.7, 0.3])
+    _c_title.subheader("4. 성과 지표 (04. 캠페인 성과)")
+
+    _in_edit = st.session_state.get("metrics_edit_mode", False)
+    if not _in_edit:
+        _c_btn.button(
+            "✏️ 편집 모드",
+            type="primary",
+            width="stretch",
+            key="enter_edit",
+        )
+        if st.session_state.get("enter_edit"):
+            st.session_state.metrics_df_backup = (
+                st.session_state.metrics_df.copy()
+                if st.session_state.metrics_df is not None else None
+            )
+            st.session_state.metrics_edit_mode = True
+            if "metrics_editor" in st.session_state:
+                del st.session_state["metrics_editor"]
+            st.rerun()
+        st.caption("표시 모드 — 편집하려면 우측 [✏️ 편집 모드] 클릭")
+    else:
+        _c_btn.markdown(
+            "<div style='padding:6px 12px;background:#fff7e0;border:1px solid #f0c060;"
+            "border-radius:4px;color:#6b4d00;font-weight:600;font-size:13px;"
+            "text-align:center;'>🟡 편집 중</div>",
+            unsafe_allow_html=True,
+        )
+        st.caption("편집 중 — 하단 [💾 저장] 또는 [❌ 취소] 클릭")
+    # 컬럼 보장 (표시·편집 양쪽에서 사용)
     if st.session_state.metrics_df is None:
         st.session_state.metrics_df = pd.DataFrame(
             columns=["indicator", "value", "note", "_select", "_kpi", "_table"]
@@ -513,67 +550,104 @@ with col_r:
         if "_table" not in df_cur.columns:
             df_cur["_table"] = True
 
-    edited = st.data_editor(
-        st.session_state.metrics_df,
-        num_rows="dynamic",
-        width="stretch",
-        column_config={
-            "_select":   st.column_config.CheckboxColumn("↕",  width="small",
-                            help="체크 후 아래 ▲▼ 로 행 이동"),
-            "_kpi":      st.column_config.CheckboxColumn("KPI", width="small",
-                            help="상단 4-카드 KPI 스트립 노출. 최대 4개. 체크된 행 순서대로."),
-            "_table":    st.column_config.CheckboxColumn("표",  width="small",
-                            help="04 캠페인 성과 표 노출. 체크된 행 순서대로."),
-            "indicator": st.column_config.TextColumn("성과 지표"),
-            "value":     st.column_config.TextColumn("성과"),
-            "note":      st.column_config.TextColumn("비고"),
-        },
-        column_order=["_select", "_kpi", "_table", "indicator", "value", "note"],
-        key="metrics_editor",
-    )
-    st.session_state.metrics_df = edited.copy()
+    if st.session_state.metrics_df is None or len(st.session_state.metrics_df) == 0:
+        st.info("좌측에서 캠페인을 로드하면 카탈로그 기반 성과 지표가 자동으로 채워집니다.")
+    elif not _in_edit:
+        # ── 표시 모드 (read-only) ──
+        # _select 는 편집 모드 전용이라 숨김
+        _display_df = st.session_state.metrics_df
+        _cols = [c for c in ["_kpi", "_table", "indicator", "value", "note"] if c in _display_df.columns]
+        st.dataframe(
+            _display_df[_cols],
+            column_config={
+                "_kpi":   st.column_config.CheckboxColumn("KPI", disabled=True, width="small"),
+                "_table": st.column_config.CheckboxColumn("표",  disabled=True, width="small"),
+                "indicator": st.column_config.TextColumn("성과 지표"),
+                "value":     st.column_config.TextColumn("성과"),
+                "note":      st.column_config.TextColumn("비고"),
+            },
+            width="stretch",
+            hide_index=True,
+        )
+    else:
+        # ── 편집 모드 ──
+        # 편집 중에는 session_state.metrics_df 에 사후 쓰기 금지.
+        # data_editor 의 key= 가 자체 캐시(edited_rows/added_rows)를 유지하므로
+        # 모든 입력은 `edited` (return value) 에 누적됨. 저장 클릭 시 commit.
+        edited = st.data_editor(
+            st.session_state.metrics_df,
+            num_rows="dynamic",
+            width="stretch",
+            column_config={
+                "_select":   st.column_config.CheckboxColumn("↕",  width="small",
+                                help="체크 후 아래 ▲▼ 로 행 이동"),
+                "_kpi":      st.column_config.CheckboxColumn("KPI", width="small",
+                                help="상단 4-카드 KPI 스트립 노출. 최대 4개. 체크된 행 순서대로."),
+                "_table":    st.column_config.CheckboxColumn("표",  width="small",
+                                help="04 캠페인 성과 표 노출. 체크된 행 순서대로."),
+                "indicator": st.column_config.TextColumn("성과 지표"),
+                "value":     st.column_config.TextColumn("성과"),
+                "note":      st.column_config.TextColumn("비고"),
+            },
+            column_order=["_select", "_kpi", "_table", "indicator", "value", "note"],
+            key="metrics_editor",
+        )
 
-    # _kpi 5개 이상 체크 시 경고만 (자동 해제 금지 — session_state 사후 수정이
-    # data_editor 내부 캐시와 desync 를 일으켜 입력 lag · 행 사라짐 유발).
-    # 빌드 시 첫 4개만 자동 사용. 사용자가 직접 5번째 체크 해제하도록 안내.
-    if "_kpi" in edited.columns:
-        _kpi_n = int(edited["_kpi"].fillna(False).sum())
-        if _kpi_n > 4:
-            st.warning(
-                f"⚠️ KPI 카드는 최대 4개 — 현재 {_kpi_n}개 체크됨. "
-                "빌드 시 상단 4개만 반영됩니다. 직접 체크 해제 권장."
-            )
+        # KPI 5개 이상 경고
+        if "_kpi" in edited.columns:
+            _kpi_n = int(edited["_kpi"].fillna(False).sum())
+            if _kpi_n > 4:
+                st.warning(
+                    f"⚠️ KPI 카드 최대 4개 — 현재 {_kpi_n}개 체크. "
+                    "저장 후 빌드 시 첫 4개만 반영. 직접 체크 해제 권장."
+                )
 
-    # ── 행 이동 컨트롤 ──────────────────────
-    def _shift_metric_row(direction: int):
-        """direction=-1 (위) / +1 (아래). 체크된 첫 행만 이동."""
-        df_now = st.session_state.metrics_df
-        if df_now is None or df_now.empty or "_select" not in df_now.columns:
-            return
-        sel = df_now.index[df_now["_select"] == True].tolist()
-        if not sel:
-            return
-        i = sel[0]
-        j = i + direction
-        if j < 0 or j >= len(df_now):
-            return
-        new_idx = df_now.index.tolist()
-        new_idx[i], new_idx[j] = new_idx[j], new_idx[i]
-        new_df = df_now.loc[new_idx].reset_index(drop=True)
-        # 이동 후 체크박스는 새 위치의 행에 유지
-        new_df["_select"] = False
-        new_df.at[j, "_select"] = True
-        st.session_state.metrics_df = new_df
-        # data_editor 의 내부 상태 리셋해야 새 순서 반영됨
-        if "metrics_editor" in st.session_state:
-            del st.session_state["metrics_editor"]
-        st.rerun()
+        # ── 행 이동 + 저장 / 취소 (편집 모드 전용) ──
+        _bcols = st.columns([0.13, 0.13, 0.13, 0.30, 0.30])
 
-    bcols = st.columns([0.18, 0.18, 0.64])
-    if bcols[0].button("▲ 위로", width="stretch", key="metric_up"):
-        _shift_metric_row(-1)
-    if bcols[1].button("▼ 아래로", width="stretch", key="metric_down"):
-        _shift_metric_row(+1)
+        def _swap_in_edited(direction: int):
+            """`edited` (사용자 입력 누적) 에서 _select 행을 1칸 이동.
+            결과를 session_state.metrics_df 에 쓰고 editor 캐시 리셋 후 rerun."""
+            df_now = edited
+            if "_select" not in df_now.columns:
+                return
+            sel = list(df_now.index[df_now["_select"].fillna(False) == True])
+            if not sel:
+                return
+            i = sel[0]
+            j = i + direction
+            if j < 0 or j >= len(df_now):
+                return
+            new_idx = df_now.index.tolist()
+            new_idx[i], new_idx[j] = new_idx[j], new_idx[i]
+            new_df = df_now.loc[new_idx].reset_index(drop=True)
+            new_df["_select"] = False
+            new_df.at[j, "_select"] = True
+            st.session_state.metrics_df = new_df
+            if "metrics_editor" in st.session_state:
+                del st.session_state["metrics_editor"]
+            st.rerun()
+
+        if _bcols[0].button("▲ 위로", width="stretch", key="metric_up"):
+            _swap_in_edited(-1)
+        if _bcols[1].button("▼ 아래로", width="stretch", key="metric_down"):
+            _swap_in_edited(+1)
+
+        if _bcols[3].button("💾 저장", type="primary", width="stretch", key="save_edit"):
+            st.session_state.metrics_df = edited.copy()
+            st.session_state.metrics_edit_mode = False
+            st.session_state.metrics_df_backup = None
+            if "metrics_editor" in st.session_state:
+                del st.session_state["metrics_editor"]
+            st.rerun()
+        if _bcols[4].button("❌ 취소", width="stretch", key="cancel_edit"):
+            if st.session_state.get("metrics_df_backup") is not None:
+                st.session_state.metrics_df = st.session_state.metrics_df_backup
+            st.session_state.metrics_edit_mode = False
+            st.session_state.metrics_df_backup = None
+            if "metrics_editor" in st.session_state:
+                del st.session_state["metrics_editor"]
+            st.rerun()
 
     st.subheader("5. 히어로 이미지")
     tab_ai, tab_upload = st.tabs(["AI 생성 (Gemini)", "직접 업로드"])
@@ -804,7 +878,12 @@ with col_r:
     )
     _build_label = "🔄 재생성 (이전 빌드 덮어쓰기)" if _has_saved_build else "📄 4개 파일 한번에 빌드"
 
-    if st.button(_build_label, type="primary", width="stretch"):
+    # 편집 모드 중이면 빌드 차단 — 미저장 변경이 산출물에 반영 안 되는 사고 방지
+    _block_build = st.session_state.get("metrics_edit_mode", False)
+    if _block_build:
+        st.warning("✏️ 4번 성과 지표 영역이 편집 모드입니다. 먼저 [💾 저장] 또는 [❌ 취소] 후 빌드 가능합니다.")
+
+    if st.button(_build_label, type="primary", width="stretch", disabled=_block_build):
         # Guard: narrative must be filled in. Hitting build before generating
         # results in a report with section headers but no body text.
         has_narrative = any(
