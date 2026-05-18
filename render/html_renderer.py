@@ -23,10 +23,12 @@ def _build_jsonld(ctx: dict[str, Any]) -> str:
     # category (industry) 기반 마스킹 라벨로 대체. 매핑 없으면 generic.
     industry = campaign.get("industry") or ""
     masked = f"{industry} 광고주" if industry else "광고주"
+    # JSON-LD 의 headline 은 plain text 만 — <br> 없는 버전 사용
+    headline_for_json = ctx.get("headline_plain") or str(ctx.get("headline", "")).replace("\n", " ").strip()
     data = {
         "@context": "https://schema.org",
         "@type": "Article",
-        "headline": ctx["headline"],
+        "headline": headline_for_json,
         "description": description,
         "about": {
             "@type": "AdvertisingCampaign",
@@ -68,10 +70,38 @@ def _split_charts(chart_set: Any) -> dict[str, Any]:
     return {"performance": perf, "inline_strategy": inline}
 
 
+def _newline_to_br(value: Any) -> Any:
+    """\\n → <br>. escape 처리 후 Markup 으로 wrap.
+    HTML 특수문자는 그대로 escape 되고 줄바꿈만 <br> 로 살아남음.
+
+    주의: Markup.replace() 는 new 값(<br>)을 자동 escape 해버리므로
+    intermediate 단계에서 반드시 plain str 로 변환해 .replace 수행."""
+    from markupsafe import Markup, escape
+    if not isinstance(value, str) or not value:
+        return value
+    escaped_plain = str(escape(value))   # Markup → plain str (특수문자만 escape)
+    with_br = escaped_plain.replace("\n", "<br>")
+    return Markup(with_br)
+
+
+def _flatten_newlines(value: Any) -> str:
+    """\\n → ' '. HTML 속성 (title / og:title / JSON-LD) 자리 용도."""
+    if not isinstance(value, str):
+        return value
+    return value.replace("\n", " ").strip()
+
+
 def _enrich(context: dict[str, Any]) -> dict[str, Any]:
     ctx = dict(context)
     ctx.setdefault("year", _dt.date.today().year)
     ctx["charts"] = _split_charts(ctx.get("chart_set"))
+    # 헤드라인·서브헤드: body 용 <br> 버전 + 속성 용 plain 버전 두 가지 동시 제공
+    _raw_h = ctx.get("headline", "")
+    _raw_s = ctx.get("subhead", "")
+    ctx["headline_plain"] = _flatten_newlines(_raw_h)
+    ctx["subhead_plain"]  = _flatten_newlines(_raw_s)
+    ctx["headline"]       = _newline_to_br(_raw_h)
+    ctx["subhead"]        = _newline_to_br(_raw_s)
     return ctx
 
 
