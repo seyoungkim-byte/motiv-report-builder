@@ -533,13 +533,16 @@ with col_r:
     )
     st.session_state.metrics_df = edited.copy()
 
-    # _kpi 가 5개 이상 체크되면 처음 4개만 활성, 나머지는 자동 해제
-    _kpi_idxs = list(edited.index[edited["_kpi"] == True])
-    if len(_kpi_idxs) > 4:
-        st.warning("⚠️ KPI 카드는 최대 4개까지. 나머지는 자동 해제됩니다.")
-        for idx in _kpi_idxs[4:]:
-            st.session_state.metrics_df.at[idx, "_kpi"] = False
-        edited = st.session_state.metrics_df
+    # _kpi 5개 이상 체크 시 경고만 (자동 해제 금지 — session_state 사후 수정이
+    # data_editor 내부 캐시와 desync 를 일으켜 입력 lag · 행 사라짐 유발).
+    # 빌드 시 첫 4개만 자동 사용. 사용자가 직접 5번째 체크 해제하도록 안내.
+    if "_kpi" in edited.columns:
+        _kpi_n = int(edited["_kpi"].fillna(False).sum())
+        if _kpi_n > 4:
+            st.warning(
+                f"⚠️ KPI 카드는 최대 4개 — 현재 {_kpi_n}개 체크됨. "
+                "빌드 시 상단 4개만 반영됩니다. 직접 체크 해제 권장."
+            )
 
     # ── 행 이동 컨트롤 ──────────────────────
     def _shift_metric_row(direction: int):
