@@ -216,8 +216,11 @@ def bar_vertical_pair(spec: dict[str, Any]) -> str:
                 fontsize=7.8, fontweight="bold",
                 color=color)
 
-    # Delta annotation between paired bars
-    if spec.get("highlight_b", True):
+    # Delta annotation between paired bars.
+    # `show_delta` (preferred) controls the ▲▼ marker; `highlight_b` is the
+    # legacy alias kept for any specs that still use it. Default True.
+    show_delta = spec.get("show_delta", spec.get("highlight_b", True))
+    if show_delta:
         for i, (av, bv) in enumerate(zip(a_vals, b_vals)):
             if av == 0:
                 continue

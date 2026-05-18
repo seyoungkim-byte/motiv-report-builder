@@ -70,15 +70,26 @@ SYSTEM_PROMPT = """당신은 데이터 시각화 큐레이터입니다.
 - bar_horizontal     : 카테고리별 값 비교 (전환률·CTR·VTR 등). 승자 1개 강조. 4~6 항목 권장.
                        data = {labels, values, value_format, highlight_idx}
 - bar_vertical_pair  : 두 그룹 비교 (대조군 vs 광고노출, 전월 vs 당월).
-                       data = {categories, series_a:{label,values}, series_b:{label,values}, value_format}
+                       data = {categories, series_a:{label,values}, series_b:{label,values},
+                               value_format, show_delta}
+                       **show_delta** (bool, default true): a→b 변화율 ▲▼ 마크 표시.
+                       사용자가 "추가 마크 없이" / "수치만" 등 지시 시 **false 로 전달**.
 - donut              : 비중/구성비. 5 슬라이스 이하 (그 이상은 "기타"로 묶기).
                        data = {labels, values, highlight_idx, center_label}
 - funnel             : 풀퍼널 단계 (노출→도달→클릭→전환 등). 3~5 단계.
                        data = {stages:[{name,value}...], value_format, show_drop}
+                       **show_drop** (bool, default true): 단계 간 유지율 표시.
+                       사용자가 "유지율 빼고" 등 지시 시 false.
 - index_lift         : 단일 강조 — 대조군 100 vs 광고 노출그룹 index.
                        data = {label, index, baseline_label, note}
 - freq_distribution  : 빈도 구간별 분포 (1회/2회/3-4회/5+).
                        data = {buckets:[{name,value,share}...], total_label}
+
+[사용자 지시 우선 처리 — 중요]
+plan_chart_candidates 의 user_instruction (또는 caption 요청) 에 "추가 마크
+없이", "수치만 그대로", "라벨만", "변화율 빼고" 등의 명시가 있으면 해당
+템플릿의 토글 옵션 (show_delta / show_drop 등) 을 false 로 전달해 자동
+마크를 끄세요. 사용자 지시 무시하지 말 것.
 
 [메트릭 정의 카탈로그 활용 — 가장 중요]
 입력 payload 의 `extras.metric_catalog` 에는 이번 캠페인에 적용된
@@ -559,6 +570,7 @@ def _data_looks_valid(template: str, data: dict[str, Any]) -> bool:
             a = data.get("series_a") or {}
             b = data.get("series_b") or {}
             cats = data.get("categories") or []
+            # Allow categories with one item (single grouped pair)
             return (
                 isinstance(cats, list) and len(cats) >= 1
                 and isinstance(a.get("values"), list)
