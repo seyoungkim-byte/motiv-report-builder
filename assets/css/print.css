@@ -159,21 +159,24 @@ body {
 
 /* ─── Body ──────────────────────────────────────────── */
 .body { margin: 0; flex: 1; }
-/* 2단 본문 — 좌: 01/02/03 / 우: 04 성과 지표 표 */
+/* 2단 본문 — 좌: 01/02/03 / 우: 04 성과 지표 표.
+   우측 표가 행수 많고 한 행에 긴 지표명이 들어가서 좌측 비중을 줄이고
+   우측을 더 넓게 (1.35:1 → 1.05:1). 또한 표 내부도 padding/font 최적화. */
 .body-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
-  gap: 5mm;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 4mm;
   margin: 0 0 3mm;
   align-items: start;
 }
 .body-grid__main h2:first-of-type { margin-top: 0; }
 .body-grid__side h2:first-of-type { margin-top: 0; }
-/* 사이드 표 — 메인 .metrics 보다 폰트 약간 작고 컴팩트 */
-.metrics--side { font-size: 7.8pt; }
-.metrics--side thead th { padding: 1.2mm 1.8mm; font-size: 7.2pt; }
-.metrics--side tbody td { padding: 1mm 1.8mm; }
-.metrics--side .metrics__note { font-size: 7.2pt; }
+/* 사이드 표 — 컴팩트 + 한국어 단어 단위 줄바꿈 (mid-word 분리 X) */
+.metrics--side          { font-size: 7.6pt; }
+.metrics--side thead th { padding: 0.9mm 1.3mm; font-size: 6.9pt; }
+.metrics--side tbody td { padding: 0.8mm 1.3mm; word-break: keep-all; }
+.metrics--side .metrics__indicator { word-break: keep-all; line-height: 1.35; }
+.metrics--side .metrics__note      { font-size: 6.9pt; word-break: keep-all; line-height: 1.35; }
 .body h2 {
   margin: 4mm 0 1.5mm;
   font-size: 11pt;
