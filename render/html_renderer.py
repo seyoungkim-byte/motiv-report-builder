@@ -75,19 +75,33 @@ def _newline_to_br(value: Any) -> Any:
     HTML 특수문자는 그대로 escape 되고 줄바꿈만 <br> 로 살아남음.
 
     주의: Markup.replace() 는 new 값(<br>)을 자동 escape 해버리므로
-    intermediate 단계에서 반드시 plain str 로 변환해 .replace 수행."""
+    intermediate 단계에서 반드시 plain str 로 변환해 .replace 수행.
+
+    Defensive: 어떤 이유든 escape 가 실패하면 원본 그대로 안전 반환.
+    빌드 전체가 죽는 것보다 줄바꿈 한번 잃는 게 낫다."""
     from markupsafe import Markup, escape
+    if value is None:
+        return ""
     if not isinstance(value, str) or not value:
         return value
-    escaped_plain = str(escape(value))   # Markup → plain str (특수문자만 escape)
-    with_br = escaped_plain.replace("\n", "<br>")
-    return Markup(with_br)
+    try:
+        escaped_plain = str(escape(value))
+        with_br = escaped_plain.replace("\n", "<br>")
+        return Markup(with_br)
+    except Exception:
+        # 비정상 입력 (Undefined 등) 받아도 빌드는 계속
+        return Markup(str(value).replace("\n", "<br>"))
 
 
 def _flatten_newlines(value: Any) -> str:
     """\\n → ' '. HTML 속성 (title / og:title / JSON-LD) 자리 용도."""
+    if value is None:
+        return ""
     if not isinstance(value, str):
-        return value
+        try:
+            value = str(value)
+        except Exception:
+            return ""
     return value.replace("\n", " ").strip()
 
 
