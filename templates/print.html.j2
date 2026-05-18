@@ -8,15 +8,11 @@
 <body>
 <section class="page">
 
-  {# ── 헤더 띠 (Securities Note 톤) ───────────────────────── #}
+  {# ── 헤더 띠 (Securities Note 톤) — 캠페인 번호/기간은 아래 메타 행에서 노출 #}
   <header class="hdr">
     <span class="hdr__brand">{{ company.name }}</span>
     <span class="hdr__divider">▌</span>
     <span class="hdr__type">Case Study Note</span>
-    <span class="hdr__meta">
-      {% if campaign.campaign_no %}No. {{ campaign.campaign_no }} · {% endif %}
-      {% if campaign.period_start %}{{ campaign.period_start }}{% if campaign.period_end %} – {{ campaign.period_end }}{% endif %}{% endif %}
-    </span>
   </header>
 
   {# ── 타이틀 + TL;DR ───────────────────────────────────── #}
