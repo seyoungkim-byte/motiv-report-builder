@@ -82,6 +82,7 @@
     {% endif %}
   </section>
 
+  {# KPI 스트립 — 지표명+수치만. 설명 텍스트(비고)는 04 표에서만 노출. #}
   {% set _kpi_list = kpi_table if kpi_table else (campaign.metrics_table[:4] if campaign.metrics_table else []) %}
   {% if _kpi_list %}
   <section class="kpis" aria-label="핵심 지표">
@@ -89,7 +90,6 @@
     <div class="kpi">
       <span class="kpi__label">{{ m.indicator }}</span>
       <span class="kpi__value">{{ m.value }}</span>
-      {% if m.note %}<span class="kpi__note">{{ m.note }}</span>{% endif %}
     </div>
     {% endfor %}
   </section>

@@ -167,17 +167,18 @@ body {
 .body { display: flex; flex-direction: column; gap: 6px; }
 .body-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
-  gap: 22px;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 18px;
   align-items: start;
   margin-bottom: 12px;
 }
 .body-grid__main h2:first-of-type { margin-top: 0; }
 .body-grid__side h2:first-of-type { margin-top: 0; }
-.metrics--side { font-size: 12.5px; }
-.metrics--side thead th { padding: 8px 10px; font-size: 11px; }
-.metrics--side tbody td { padding: 7px 10px; }
-.metrics--side .metrics__note { font-size: 11.5px; }
+.metrics--side          { font-size: 12.5px; }
+.metrics--side thead th { padding: 7px 9px; font-size: 10.5px; }
+.metrics--side tbody td { padding: 6px 9px; word-break: keep-all; line-height: 1.4; }
+.metrics--side .metrics__indicator { word-break: keep-all; }
+.metrics--side .metrics__note      { font-size: 11px; word-break: keep-all; line-height: 1.4; }
 @media (max-width: 720px) {
   .body-grid { grid-template-columns: 1fr; }
 }
