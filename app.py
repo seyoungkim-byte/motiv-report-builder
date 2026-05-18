@@ -342,12 +342,21 @@ with col_l:
         st.session_state["headline"] = (
             f"{campaign.masked_advertiser} 캠페인 사례"
         )
-    st.text_input(
+    st.text_area(
         "헤드라인",
         key="headline",
-        help="예시: '크로스디바이스 광고로 고객 획득 비용 53% 절감한 성인영양식 캠페인 사례'",
+        height=80,
+        help=(
+            "예시: '크로스디바이스 광고로 고객 획득 비용 53% 절감한 성인영양식 캠페인 사례'. "
+            "Enter 로 줄바꿈 가능 — 입력한 위치 그대로 PDF·HTML 에 반영됩니다."
+        ),
     )
-    st.text_input("서브헤드 (선택)", key="subhead")
+    st.text_area(
+        "서브헤드 (선택)",
+        key="subhead",
+        height=68,
+        help="Enter 로 줄바꿈 가능.",
+    )
 
     # ── 2-B. 캠페인 운영 개요 (헤더 메타) ──────────────────
     # DB 에 있는 값(광고주·기간·번호) 은 자동 prefill, DB 에 없는 값(상품·측정·태그)

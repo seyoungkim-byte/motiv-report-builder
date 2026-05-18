@@ -47,15 +47,24 @@ def render_press_docx(context: dict[str, Any], out_path: Path) -> Path:
     r.font.color.rgb = OLIVE
     r.font.size = Pt(10)
 
-    title = doc.add_heading(headline, level=1)
-    for run in title.runs:
+    # 헤드라인 — \n 으로 줄바꿈된 경우 run.add_break() 로 같은 단락 안에서 분리
+    title = doc.add_heading("", level=1)
+    _lines = (headline or "").split("\n")
+    for i, line in enumerate(_lines):
+        run = title.add_run(line)
         run.font.size = Pt(20)
+        if i < len(_lines) - 1:
+            run.add_break()
 
     if subhead:
         sub = doc.add_paragraph()
-        rs = sub.add_run(subhead)
-        rs.italic = True
-        rs.font.size = Pt(11)
+        _sub_lines = subhead.split("\n")
+        for i, line in enumerate(_sub_lines):
+            rs = sub.add_run(line)
+            rs.italic = True
+            rs.font.size = Pt(11)
+            if i < len(_sub_lines) - 1:
+                rs.add_break()
 
     if narrative.get("summary"):
         _heading(doc, "요약", size=13)
