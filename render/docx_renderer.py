@@ -66,14 +66,45 @@ def render_press_docx(context: dict[str, Any], out_path: Path) -> Path:
             if i < len(_sub_lines) - 1:
                 rs.add_break()
 
+    # **bold** 마크업은 docx 에서도 같은 형태로 변환 (run.bold = True 적용)
+    import re as _re
+    _bold_re = _re.compile(r"\*\*(.+?)\*\*")
+
     if narrative.get("summary"):
         _heading(doc, "요약", size=13)
-        doc.add_paragraph(narrative["summary"])
+        # summary 는 단락 — bold 마크업 처리 후 add_paragraph
+        _p_sum = doc.add_paragraph()
+        # 아래 _add_runs_with_bold 가 곧 정의됨 — re module 이미 위에서 import.
+        _sum_text = narrative["summary"]
+        _pos = 0
+        for _m in _bold_re.finditer(_sum_text):
+            if _m.start() > _pos:
+                _p_sum.add_run(_sum_text[_pos:_m.start()])
+            _r = _p_sum.add_run(_m.group(1))
+            _r.bold = True
+            _pos = _m.end()
+        if _pos < len(_sum_text):
+            _p_sum.add_run(_sum_text[_pos:])
+
+    def _add_runs_with_bold(paragraph, text: str):
+        """`**bold**` 마크업이 들어간 텍스트를 docx run 으로 쪼개서 추가.
+        bold 부분은 run.bold=True, 나머지는 일반."""
+        if not text:
+            return
+        pos = 0
+        for m in _bold_re.finditer(text):
+            if m.start() > pos:
+                paragraph.add_run(text[pos:m.start()])
+            r = paragraph.add_run(m.group(1))
+            r.bold = True
+            pos = m.end()
+        if pos < len(text):
+            paragraph.add_run(text[pos:])
 
     for key, title_text in [
-        ("overview", "01. 캠페인 개요"),
+        ("overview", "01. 캠페인 목적"),
         ("background", "02. 광고 집행 배경"),
-        ("strategy", "03. 적용 전략 · 핵심 성과"),
+        ("strategy", "03. 적용 전략"),
     ]:
         raw = narrative.get(key)
         # 새 스키마 = list[str] 불릿, 옛 스키마 = str 단락. 둘 다 흡수.
@@ -82,15 +113,24 @@ def render_press_docx(context: dict[str, Any], out_path: Path) -> Path:
             if not items:
                 continue
             _heading(doc, title_text, size=13)
-            for item in items:
-                p = doc.add_paragraph(style="List Bullet")
-                p.add_run(item)
+            # strategy 의 첫 항목은 lead-in 단락 (불릿 X), 나머지만 불릿
+            if key == "strategy" and len(items) >= 1:
+                p = doc.add_paragraph()
+                _add_runs_with_bold(p, items[0])
+                for item in items[1:]:
+                    bp = doc.add_paragraph(style="List Bullet")
+                    _add_runs_with_bold(bp, item)
+            else:
+                for item in items:
+                    p = doc.add_paragraph(style="List Bullet")
+                    _add_runs_with_bold(p, item)
         else:
             body = (raw or "").strip() if isinstance(raw, str) else ""
             if not body:
                 continue
             _heading(doc, title_text, size=13)
-            doc.add_paragraph(body)
+            p = doc.add_paragraph()
+            _add_runs_with_bold(p, body)
 
     # 04. results table
     metrics = campaign.get("metrics_table") or []
@@ -113,7 +153,7 @@ def render_press_docx(context: dict[str, Any], out_path: Path) -> Path:
         _heading(doc, "05. 인사이트", size=13)
         for item in insights:
             p = doc.add_paragraph(style="List Bullet")
-            p.add_run(str(item))
+            _add_runs_with_bold(p, str(item))
 
     doc.add_paragraph()
     _heading(doc, f"About {s.company_name}", level=3, size=11)

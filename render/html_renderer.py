@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -10,8 +11,60 @@ from config import ASSETS_DIR, load_settings
 from .jinja_env import build_env
 
 
+_BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
+
+
 def _css(name: str) -> str:
     return (ASSETS_DIR / "css" / name).read_text(encoding="utf-8")
+
+
+def _strip_md(value: Any) -> str:
+    """**bold** 마크업과 \\n 을 제거한 plain 문자열. JSON-LD / meta 속성 자리용."""
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        try:
+            value = str(value)
+        except Exception:
+            return ""
+    s = _BOLD_RE.sub(r"\1", value)
+    return s.replace("\n", " ").strip()
+
+
+def _md_to_safe_html(value: Any) -> Any:
+    """본문 string → escape 후 \\n→<br>, **text**→<strong>text</strong> 변환.
+    템플릿 안에서 그대로 출력해도 안전한 Markup 반환.
+    Defensive: 비정상 입력이면 원본 그대로 반환 (빌드 멈추지 않게)."""
+    from markupsafe import Markup, escape
+    if value is None:
+        return ""
+    if not isinstance(value, str) or not value:
+        return value
+    try:
+        s = str(escape(value))
+        s = s.replace("\n", "<br>")
+        # escape 후엔 ** 그대로 살아있음 (markdown 특수문자 아님). 변환.
+        s = _BOLD_RE.sub(r"<strong>\1</strong>", s)
+        return Markup(s)
+    except Exception:
+        return Markup(str(value))
+
+
+def _enrich_narrative(nar: dict[str, Any]) -> dict[str, Any]:
+    """narrative dict 의 모든 string 값을 _md_to_safe_html 로 변환.
+    list[str] 항목은 항목별 변환. 원본 dict 는 그대로 두고 새 dict 반환."""
+    out: dict[str, Any] = {}
+    for k, v in (nar or {}).items():
+        if isinstance(v, str):
+            out[k] = _md_to_safe_html(v)
+        elif isinstance(v, list):
+            out[k] = [
+                _md_to_safe_html(item) if isinstance(item, str) else item
+                for item in v
+            ]
+        else:
+            out[k] = v
+    return out
 
 
 def _build_jsonld(ctx: dict[str, Any]) -> str:
@@ -19,12 +72,17 @@ def _build_jsonld(ctx: dict[str, Any]) -> str:
     campaign = ctx["campaign"]
     narrative = ctx["narrative"]
     # summary/overview 가 list 일 수도 있음 (옛 빌드는 str). join 으로 평탄화.
+    # 또한 본문엔 **bold** 마크업이 살아있으니 plain 으로 strip 후 사용.
     _summary = narrative.get("summary") or ""
     if isinstance(_summary, list):
-        _summary = " ".join(str(x) for x in _summary)
+        _summary = " ".join(_strip_md(x) for x in _summary)
+    else:
+        _summary = _strip_md(_summary)
     _overview = narrative.get("overview") or ""
     if isinstance(_overview, list):
-        _overview = " ".join(str(x) for x in _overview)
+        _overview = " ".join(_strip_md(x) for x in _overview)
+    else:
+        _overview = _strip_md(_overview)
     description = (_summary or _overview)[:280]
     # JSON-LD 는 search engine / AI 가 직접 인덱싱하므로 실제 광고주명 노출 금지.
     # category (industry) 기반 마스킹 라벨로 대체. 매핑 없으면 generic.
@@ -102,21 +160,26 @@ def _enrich(context: dict[str, Any]) -> dict[str, Any]:
     ctx = dict(context)
     ctx.setdefault("year", _dt.date.today().year)
     ctx["charts"] = _split_charts(ctx.get("chart_set"))
-    # 헤드라인·서브헤드: body 용 <br> 버전 + 속성 용 plain 버전 두 가지 동시 제공
+    # 헤드라인·서브헤드: body 용 <br> 버전 + 속성 용 plain 버전 두 가지 동시 제공.
+    # 헤드라인도 **bold** 마크업 지원 — 사용자가 강조 단어 지정 가능.
     _raw_h = ctx.get("headline", "")
     _raw_s = ctx.get("subhead", "")
-    ctx["headline_plain"] = _flatten_newlines(_raw_h)
-    ctx["subhead_plain"]  = _flatten_newlines(_raw_s)
-    ctx["headline"]       = _newline_to_br(_raw_h)
-    ctx["subhead"]        = _newline_to_br(_raw_s)
+    ctx["headline_plain"] = _strip_md(_raw_h)
+    ctx["subhead_plain"]  = _strip_md(_raw_s)
+    ctx["headline"]       = _md_to_safe_html(_raw_h)
+    ctx["subhead"]        = _md_to_safe_html(_raw_s)
+    # narrative 의 string 필드들도 동일 변환 (template 에서 그대로 출력)
+    ctx["narrative"] = _enrich_narrative(ctx.get("narrative") or {})
     return ctx
 
 
 def render_web_html(context: dict[str, Any], out_path: Path) -> Path:
+    # jsonld 는 원본 plain narrative 로 먼저 만들어야 escape 깨지지 않음.
+    jsonld = _build_jsonld(context)
     ctx = _enrich(context)
     env = build_env()
     tpl = env.get_template("web.html.j2")
-    html = tpl.render(**ctx, css=_css("web.css"), jsonld=_build_jsonld(ctx))
+    html = tpl.render(**ctx, css=_css("web.css"), jsonld=jsonld)
     out_path.write_text(html, encoding="utf-8")
     return out_path
 
