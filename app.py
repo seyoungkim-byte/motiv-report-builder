@@ -483,17 +483,13 @@ with col_l:
             st.session_state.narrative.get(TLDR_KEY, [])
         )
 
-    # TL;DR sits at the top — it's the eyebrow line under the headline,
-    # shown as three side-by-side chips in print/web.
-    st.text_area(
-        TLDR_LABEL + " — 한 줄에 한 항목, 30~45자 단문 3개",
-        height=90,
-        key="nar_tldr",
-        help="헤더 옆 3분할 박스에 들어갑니다. 핵심 사실 1개씩.",
+    # TL;DR 은 v3 레이아웃에서 미사용 — UI 노출 안 함. 옛 빌드 호환은 setdefault 로.
+    st.session_state.narrative[TLDR_KEY] = []
+
+    st.caption(
+        "💡 본문 내 핵심 phrase 는 `**텍스트**` 로 감싸면 자동으로 하이라이터 마커로 강조됩니다. "
+        "한 섹션당 1~2개 권장."
     )
-    st.session_state.narrative[TLDR_KEY] = [
-        line.strip() for line in st.session_state["nar_tldr"].splitlines() if line.strip()
-    ][:3]
 
     for key, label in NARRATIVE_SECTIONS:
         if key in BULLET_SECTIONS:
