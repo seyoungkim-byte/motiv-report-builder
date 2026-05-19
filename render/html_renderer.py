@@ -18,7 +18,14 @@ def _build_jsonld(ctx: dict[str, Any]) -> str:
     s = load_settings()
     campaign = ctx["campaign"]
     narrative = ctx["narrative"]
-    description = (narrative.get("summary") or narrative.get("overview") or "")[:280]
+    # summary/overview 가 list 일 수도 있음 (옛 빌드는 str). join 으로 평탄화.
+    _summary = narrative.get("summary") or ""
+    if isinstance(_summary, list):
+        _summary = " ".join(str(x) for x in _summary)
+    _overview = narrative.get("overview") or ""
+    if isinstance(_overview, list):
+        _overview = " ".join(str(x) for x in _overview)
+    description = (_summary or _overview)[:280]
     # JSON-LD 는 search engine / AI 가 직접 인덱싱하므로 실제 광고주명 노출 금지.
     # category (industry) 기반 마스킹 라벨로 대체. 매핑 없으면 generic.
     industry = campaign.get("industry") or ""
