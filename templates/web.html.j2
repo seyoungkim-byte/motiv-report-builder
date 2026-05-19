@@ -3,9 +3,10 @@
 <head>
 <meta charset="utf-8">
 <title>{{ headline_plain or headline }} | {{ campaign.industry or '광고' }} 케이스스터디</title>
-<meta name="description" content="{{ (narrative.summary or narrative.overview)[:160] }}">
+{% set _desc = narrative.summary if narrative.summary is string else (narrative.summary|join(' ') if narrative.summary else '') %}
+<meta name="description" content="{{ _desc[:160] }}">
 <meta property="og:title" content="{{ headline_plain or headline }}">
-<meta property="og:description" content="{{ (narrative.summary or narrative.overview)[:200] }}">
+<meta property="og:description" content="{{ _desc[:200] }}">
 {% if hero_image_url %}<meta property="og:image" content="{{ hero_image_url }}">{% endif %}
 <style>{{ css | safe }}</style>
 <script type="application/ld+json">
@@ -15,172 +16,133 @@
 <body>
 <article class="note">
 
-  <header class="hdr">
-    <span class="hdr__brand">{{ company.name }}</span>
-    <span class="hdr__divider">▌</span>
-    <span class="hdr__type">Case Study Note</span>
-  </header>
+  {# === HERO === #}
+  <header class="hero">
+    <div class="hero__left">
+      <div class="hero__eyebrow">{{ company.name }}<span>Case Study</span></div>
+      <h1 class="hero__title">{{ headline }}</h1>
+      {% if subhead %}<p class="hero__sub">{{ subhead }}</p>{% endif %}
+      <hr class="hero__rule">
 
-  <section class="title-block">
-    <h1 class="title-block__h1">{{ headline }}</h1>
-    {% if subhead %}<p class="title-block__sub">{{ subhead }}</p>{% endif %}
-
-    {% set hm = header_meta or {} %}
-    {% if hm %}
-    <div class="hdr-meta">
-      <div class="hdr-meta__row">
-        {% if hm.advertiser %}
-        <span class="hdr-meta__item">
-          <span class="hdr-meta__dot"></span>
-          <span class="hdr-meta__label">광고주</span>
-          <span class="hdr-meta__value">{{ hm.advertiser }}</span>
-        </span>
-        {% endif %}
-        {% if hm.period_start %}
-        <span class="hdr-meta__item">
-          <span class="hdr-meta__dot"></span>
-          <span class="hdr-meta__label">집행 기간</span>
-          <span class="hdr-meta__value">
-            {{ hm.period_start }}{% if hm.period_end %} ~ {{ hm.period_end }}{% endif %}
-            {% if hm.cumulative_period %} · {{ hm.cumulative_period }}{% endif %}
-          </span>
+      {% set hm = header_meta or {} %}
+      {% if hm.period_month or hm.media_products %}
+      <div class="hero__meta">
+        {% if hm.period_month %}
+        <span class="hero__meta__item">
+          <span class="hero__meta__label">집행 기간</span>
+          <span class="hero__meta__value">{{ hm.period_month }}</span>
         </span>
         {% endif %}
         {% if hm.media_products %}
-        <span class="hdr-meta__item">
-          <span class="hdr-meta__dot"></span>
-          <span class="hdr-meta__label">집행 상품</span>
-          <span class="hdr-meta__value">{{ hm.media_products }}</span>
+        <span class="hero__meta__item">
+          <span class="hero__meta__label">집행 매체</span>
+          <span class="hero__meta__value">{{ hm.media_products }}</span>
         </span>
         {% endif %}
-        {% if hm.measurement_source %}
-        <span class="hdr-meta__item">
-          <span class="hdr-meta__dot"></span>
-          <span class="hdr-meta__label">구매 측정</span>
-          <span class="hdr-meta__value">{{ hm.measurement_source }}</span>
-        </span>
-        {% endif %}
-      </div>
-      {% if hm.tags %}
-      <div class="hdr-meta__tags">
-        {% for tag in hm.tags %}<span class="hdr-meta__chip">{{ tag }}</span>{% endfor %}
       </div>
       {% endif %}
     </div>
+
+    {% if hero_image_url %}
+    <div class="hero__img" style="background-image:url('{{ hero_image_url }}'); background-size:cover; background-position:center;"></div>
+    {% else %}
+    <div class="hero__img hero__img--placeholder" aria-label="product image placeholder"></div>
     {% endif %}
+  </header>
 
-    {% if narrative.tldr %}
-    <ul class="tldr">
-      {% for item in narrative.tldr %}
-      <li>{{ item }}</li>
-      {% endfor %}
-    </ul>
-    {% endif %}
-  </section>
+  {# === BODY === #}
+  <div class="body">
 
-  {# KPI 스트립 — 지표명+수치만. 설명 텍스트(비고)는 04 표에서만 노출. #}
-  {% set _kpi_list = kpi_table if kpi_table else (campaign.metrics_table[:4] if campaign.metrics_table else []) %}
-  {% if _kpi_list %}
-  <section class="kpis" aria-label="핵심 지표">
-    {% for m in _kpi_list[:4] %}
-    <div class="kpi">
-      <span class="kpi__label">{{ m.indicator }}</span>
-      <span class="kpi__value">{{ m.value }}</span>
-    </div>
-    {% endfor %}
-  </section>
-  {% endif %}
+    <div class="body__left">
 
-  <section class="body">
+      {% if narrative.summary %}
+      <div class="summary">
+        <h3>요약</h3>
+        <p>{{ narrative.summary }}</p>
+      </div>
+      {% endif %}
 
-    {% if narrative.summary %}
-    <div class="summary">
-      <h3>요약</h3>
-      <p>{{ narrative.summary }}</p>
-    </div>
-    {% endif %}
+      {% macro sec(num, title, items) %}
+        <h2 class="sec"><span class="num">{{ num }}.</span>{{ title }}</h2>
+        {% if items is string %}
+          {% if items %}<p>{{ items }}</p>{% endif %}
+        {% elif items %}
+          <ul class="bul">
+            {% for it in items %}<li>{{ it }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      {% endmacro %}
 
-    {% macro section(num, title, items) %}
-      <h2><span class="sec-num">{{ num }}</span>{{ title }}</h2>
-      {% if items is string %}
-        <p>{{ items }}</p>
-      {% elif items %}
-        <ul class="body-bullets">
-          {% for it in items %}<li>{{ it }}</li>{% endfor %}
+      {{ sec('01', '캠페인 목적',    narrative.overview)   }}
+      {{ sec('02', '광고 집행 배경', narrative.background) }}
+
+      <h2 class="sec"><span class="num">03.</span>적용 전략</h2>
+      {% if narrative.strategy is string %}
+        {% if narrative.strategy %}<p>{{ narrative.strategy }}</p>{% endif %}
+      {% elif narrative.strategy %}
+        {% set strat = narrative.strategy %}
+        {% if strat|length > 0 %}<p>{{ strat[0] }}</p>{% endif %}
+        {% if strat|length > 1 %}
+        <ul class="bul">
+          {% for it in strat[1:] %}<li>{{ it }}</li>{% endfor %}
         </ul>
+        {% endif %}
       {% endif %}
-    {% endmacro %}
 
-    <div class="body-grid">
-      <div class="body-grid__main">
-        {{ section('01', '캠페인 개요',           narrative.overview)   }}
-        {{ section('02', '광고 집행 배경',         narrative.background) }}
-        {{ section('03', '적용 전략 · 핵심 성과',  narrative.strategy)   }}
-      </div>
+    </div>
+
+    <div class="body__right">
 
       {% if campaign.metrics_table %}
-      <aside class="body-grid__side">
-        <h2><span class="sec-num">04</span>캠페인 성과</h2>
-        <table class="metrics metrics--side">
+      <div class="metrics-wrap">
+        <h2 class="sec sec--right"><span class="num">04.</span>캠페인 성과</h2>
+        <table class="metrics">
           <thead>
-            <tr><th>성과 지표</th><th>성과</th><th>비고</th></tr>
+            <tr><th style="width:38%">성과 지표</th><th style="width:24%">수치</th><th>비고</th></tr>
           </thead>
           <tbody>
-            {% for m in campaign.metrics_table %}
+            {% for m in campaign.metrics_table[:4] %}
             <tr>
-              <td class="metrics__indicator">{{ m.indicator }}</td>
-              <td class="metrics__value">{{ m.value }}</td>
-              <td class="metrics__note">{{ m.note }}</td>
+              <td class="ind">{{ m.indicator }}</td>
+              <td class="val{% if loop.last %} warm{% endif %}">{{ m.value }}</td>
+              <td class="note">{{ m.note }}</td>
             </tr>
             {% endfor %}
           </tbody>
         </table>
-      </aside>
+      </div>
       {% endif %}
-    </div>
 
-    {% if narrative.insights %}
-    <div class="insights-box">
-      <h3>핵심 인사이트</h3>
-      <ul>
-        {% for item in narrative.insights %}
-        <li>{{ item }}</li>
-        {% endfor %}
-      </ul>
-    </div>
-    {% endif %}
+      {% if narrative.insights %}
+      <div class="insights">
+        <h2>05. 인사이트 <small>Motiv's Value</small></h2>
+        <ul>
+          {% for item in narrative.insights %}
+          <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
 
-    {% set all_charts = (charts.performance or []) + ([charts.inline_strategy] if charts.inline_strategy else []) %}
-    {% if all_charts %}
-    <div class="figs figs--{{ all_charts|length }}">
-      {% for ch in all_charts %}
-      <figure class="fig">
-        <div class="fig__head">
-          <span class="fig__num">[그림 {{ loop.index }}]</span>
-          <span class="fig__title">{{ ch.title }}</span>
-        </div>
-        <img src="data:image/png;base64,{{ ch.image_b64 }}" alt="{{ ch.title }}">
-        {% if ch.caption %}<figcaption>{{ ch.caption }}</figcaption>{% endif %}
-      </figure>
-      {% endfor %}
     </div>
-    {% endif %}
-  </section>
+  </div>
 
+  {# === FOOTER === #}
   <footer class="ftr">
     <div class="ftr__about">
       <strong>About {{ company.name }}</strong>
-      <span>{{ company.description }}</span>
+      <p>{{ company.description }}</p>
     </div>
     <div class="ftr__meta">
-      <span>
+      <div>
         <a href="{{ company.url }}">{{ company.url }}</a>
         {% if company.url_secondary %} · <a href="{{ company.url_secondary }}">{{ company.url_secondary }}</a>{% endif %}
-      </span>
-      <span><a href="mailto:{{ company.press_contact_email }}">{{ company.press_contact_email }}</a></span>
-      <span>© {{ year }} {{ company.name }} Inc.</span>
+      </div>
+      <div><a href="mailto:{{ company.press_contact_email }}">{{ company.press_contact_email }}</a></div>
+      <div>© {{ year }} {{ company.name }} Inc.</div>
     </div>
   </footer>
+
 </article>
 </body>
 </html>
