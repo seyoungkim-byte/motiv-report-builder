@@ -923,6 +923,12 @@ with col_r:
     if _block_build:
         st.warning("✏️ 4번 성과 지표 영역이 편집 모드입니다. 먼저 [💾 저장] 또는 [❌ 취소] 후 빌드 가능합니다.")
 
+    _auto_hero = st.checkbox(
+        "🖼️ 히어로 이미지 자동 생성 (Gemini)",
+        value=True,
+        help="이미지가 아직 없으면 빌드 시 Gemini 가 자동 생성합니다. 끄면 placeholder 로 빌드.",
+        key="auto_hero_on_build",
+    )
     if st.button(_build_label, type="primary", width="stretch", disabled=_block_build):
         # Guard: narrative must be filled in. Hitting build before generating
         # results in a report with section headers but no body text.
@@ -937,6 +943,23 @@ with col_r:
                 "(또는 각 textarea에 직접 입력)"
             )
             st.stop()
+
+        # Hero image auto-fallback — 사용자가 명시적으로 생성 안 했고 토글 ON 이면
+        # Gemini 호출로 한 번 시도. 실패해도 빌드는 계속 (placeholder 로).
+        if _auto_hero and not st.session_state.get("hero_path"):
+            try:
+                with st.spinner("히어로 이미지 자동 생성 중…"):
+                    _brief = (
+                        f"{campaign.channel or 'CTV/Mobile'} 광고 케이스스터디 히어로 이미지. "
+                        f"업종: {campaign.industry or '광고 일반'}. "
+                        "담백한 에디토리얼 톤, 라이프스타일 중심, 텍스트·로고·실제 브랜드 노출 없음."
+                    )
+                    _path = generate_hero_image(
+                        _brief, filename=f"hero_{campaign.campaign_no}.png"
+                    )
+                    st.session_state.hero_path = str(_path)
+            except Exception as e:
+                st.info(f"히어로 이미지 자동 생성 실패 — placeholder 로 빌드합니다. ({e})")
         # materialize the edited metrics back into the campaign payload.
         # _kpi / _table 체크박스 분리 — 상단 KPI 스트립과 04 표가 서로 다른
         # 부분집합/순서를 가질 수 있게.
@@ -1028,6 +1051,18 @@ with col_r:
             for t in (st.session_state.hdr_tags_raw or "").splitlines()
             if t.strip()
         ]
+        # 집행 기간(월 단위) — '2026.01 – 02' 식 사용자 친화 표기. 일자 노출 금지.
+        def _fmt_period_month(start: str | None, end: str | None) -> str:
+            if not start: return ""
+            s7 = start[:7].replace("-", ".") if len(start) >= 7 else ""
+            if not end: return s7
+            e7 = end[:7].replace("-", ".") if len(end) >= 7 else ""
+            if not e7 or s7 == e7: return s7
+            # 같은 해면 끝월만 짧게 ('2026.01 – 02'), 해 다르면 풀로
+            if s7[:4] == e7[:4]:
+                return f"{s7} – {e7[5:]}"
+            return f"{s7} – {e7}"
+
         header_meta = {
             # 사용자 입력
             "media_products":     (st.session_state.hdr_media_products or "").strip(),
@@ -1039,6 +1074,7 @@ with col_r:
             "campaign_no":  campaign.campaign_no,
             "period_start": campaign.period_start,
             "period_end":   campaign.period_end,
+            "period_month": _fmt_period_month(campaign.period_start, campaign.period_end),
         }
 
         context = {
