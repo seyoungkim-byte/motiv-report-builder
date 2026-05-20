@@ -11,9 +11,26 @@ it comfortably; if average grows we can move binaries to Supabase Storage.
 from __future__ import annotations
 
 import base64
+import math
 from typing import Any
 
 from .supabase_client import get_client
+
+
+def _clean_for_json(obj: Any) -> Any:
+    """NaN / Infinity 를 None 으로 치환. dict / list 재귀 처리.
+    pandas DataFrame.to_dict() 가 빈 셀을 float('nan') 로 채우는데, 그게
+    그대로 supabase-py 로 가면 ValueError 'Out of range float values are
+    not JSON compliant'. 모든 페이로드를 보내기 직전에 한 번 청소."""
+    if isinstance(obj, dict):
+        return {k: _clean_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_clean_for_json(x) for x in obj]
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    return obj
 
 
 TABLE = "campaign_report_builds"
@@ -67,7 +84,7 @@ def save_build(
         _LAST_ERROR = "Supabase 클라이언트 미초기화 (SUPABASE_URL / SUPABASE_KEY 확인)"
         return False
     try:
-        client.table(TABLE).upsert({
+        payload = _clean_for_json({
             "campaign_no": campaign_no,
             "built_by": user_email,
             "headline": headline or "",
@@ -77,12 +94,14 @@ def save_build(
             "narrative": narrative or {},
             "metrics_table": metrics_table or [],
             "header_meta": header_meta or {},
-            "hero_image_b64": _b64encode(hero_image),
-            "html_b64": _b64encode(html),
-            "pdf_b64":  _b64encode(pdf),
-            "docx_b64": _b64encode(docx),
-            "txt_b64":  _b64encode(txt),
-        }, on_conflict="campaign_no").execute()
+        })
+        # binary payloads — base64 텍스트는 NaN 없음, 별도 추가.
+        payload["hero_image_b64"] = _b64encode(hero_image)
+        payload["html_b64"] = _b64encode(html)
+        payload["pdf_b64"]  = _b64encode(pdf)
+        payload["docx_b64"] = _b64encode(docx)
+        payload["txt_b64"]  = _b64encode(txt)
+        client.table(TABLE).upsert(payload, on_conflict="campaign_no").execute()
         _LAST_ERROR = None
         return True
     except Exception as e:
