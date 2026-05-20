@@ -59,7 +59,11 @@ def load_settings() -> Settings:
         anthropic_api_key=_secret("ANTHROPIC_API_KEY"),
         anthropic_text_model=_secret("ANTHROPIC_TEXT_MODEL", "claude-sonnet-4-6"),
         gemini_api_key=_secret("GEMINI_API_KEY"),
-        gemini_image_model=_secret("GEMINI_IMAGE_MODEL", "imagen-3.0-generate-002"),
+        # 주의: imagen-3.0-generate-002 는 generate_content API 로 이미지를 출력하지
+        # 못하므로 ai/gemini_client.py 가 즉시 실패함. 기본값은 multimodal 이미지
+        # 출력이 가능한 gemini-2.5-flash-image-preview. 다른 모델을 쓰려면 Streamlit
+        # Secrets 의 GEMINI_IMAGE_MODEL 로 덮어쓰기.
+        gemini_image_model=_secret("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image-preview"),
         output_dir=output_dir,
         company_name=_secret("COMPANY_NAME", "Motiv Intelligence"),
         company_url=_secret("COMPANY_URL", "https://www.motiv-i.com"),

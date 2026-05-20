@@ -39,9 +39,9 @@ body {
 /* ─── Hero ──────────────────────────────────────────── */
 .hero {
   display: grid;
-  grid-template-columns: 1.35fr 1fr;
-  gap: 22px;
-  align-items: stretch;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 26px;
+  align-items: center;
   padding-bottom: 16px;
 }
 .hero__eyebrow {
@@ -107,13 +107,18 @@ body {
 
 .hero__img {
   width: 100%;
-  aspect-ratio: 1.1 / 1;
-  border-radius: 6px;
+  max-width: 220px;
+  aspect-ratio: 4 / 5;
+  margin-left: auto;
+  border-radius: 10px;
   background-color: #2d2218;
   background-size: cover;
   background-position: center;
   position: relative;
   overflow: hidden;
+  box-shadow:
+    0 6px 18px rgba(40, 30, 20, 0.18),
+    0 2px 6px rgba(40, 30, 20, 0.10);
 }
 .hero__img--placeholder {
   background:

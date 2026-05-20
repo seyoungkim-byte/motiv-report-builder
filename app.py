@@ -1004,7 +1004,23 @@ with col_r:
                     )
                     st.session_state.hero_path = str(_path)
             except Exception as e:
-                st.info(f"히어로 이미지 자동 생성 실패 — placeholder 로 빌드합니다. ({e})")
+                st.warning(
+                    "⚠️ **히어로 이미지 자동 생성 실패** — placeholder 로 빌드를 계속합니다."
+                )
+                with st.expander("🔍 원인 진단 가이드", expanded=False):
+                    st.markdown(
+                        "**가장 흔한 원인 3가지:**\n\n"
+                        "1. **`GEMINI_API_KEY` Streamlit Secrets 에 없음**\n"
+                        "   - Streamlit Cloud → 앱 Settings → Secrets → 추가:\n"
+                        "     `GEMINI_API_KEY = \"...\"`\n\n"
+                        "2. **`GEMINI_IMAGE_MODEL` 이 이미지 출력 안 되는 모델**\n"
+                        "   - 권장: `GEMINI_IMAGE_MODEL = \"gemini-2.5-flash-image-preview\"` (default)\n"
+                        "   - imagen-* 모델은 generate_content API 와 호환 X\n\n"
+                        "3. **모델/리전 권한 또는 안전 필터**\n"
+                        "   - 모델 페이지에서 활성화 여부 확인\n"
+                        "   - 또는 캠페인 industry/channel 텍스트가 필터에 걸렸을 수 있음\n"
+                    )
+                    st.code(str(e), language="text")
         # materialize the edited metrics back into the campaign payload.
         # _kpi / _table 체크박스 분리 — 상단 KPI 스트립과 04 표가 서로 다른
         # 부분집합/순서를 가질 수 있게.
