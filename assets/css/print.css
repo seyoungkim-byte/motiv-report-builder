@@ -25,9 +25,9 @@ body {
 /* ─── Hero ──────────────────────────────────────────── */
 .hero {
   display: grid;
-  grid-template-columns: 1.35fr 1fr;
-  gap: 5mm;
-  align-items: stretch;
+  grid-template-columns: 1.6fr 1fr;       /* 텍스트 영역 살짝 더 넓게 */
+  gap: 7mm;
+  align-items: center;                    /* 이미지를 텍스트와 수직 중앙 정렬 */
   padding-bottom: 2.5mm;
 }
 .hero__eyebrow {
@@ -99,13 +99,18 @@ body {
 
 .hero__img {
   width: 100%;
-  aspect-ratio: 1.1 / 1;
-  border-radius: 1.5mm;
+  max-width: 58mm;                                /* 너무 커지지 않게 cap */
+  aspect-ratio: 4 / 5;                            /* portrait, 살짝 세로 */
+  margin-left: auto;                              /* hero grid 셀 내 우측 정렬 */
+  border-radius: 3mm;                             /* 둥근 모서리 */
   background-color: #2d2218;
   background-size: cover;
   background-position: center;
   position: relative;
   overflow: hidden;
+  box-shadow:
+    0 1.2mm 3mm rgba(40, 30, 20, 0.18),           /* 메인 그림자 */
+    0 0.3mm 1mm rgba(40, 30, 20, 0.10);           /* 가까이 살짝 더 */
 }
 .hero__img--placeholder {
   background:
