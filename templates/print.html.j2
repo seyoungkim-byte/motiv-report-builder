@@ -120,12 +120,11 @@
           </thead>
           <tbody>
             {# 8 row cap — 그 이상이면 1page 넘침 위험. 편집 모드의 '표' 체크박스 OFF 로 조절.
-               '강조' (m.highlight) 가 켜진 행만 coral. 명시 강조가 0개면 마지막 행 자동 fallback. #}
-            {% set _any_h = (campaign.metrics_table | selectattr('highlight') | list | length) > 0 %}
+               '강조' (m.highlight) 가 켜진 행만 coral. 0개면 강조 없음. #}
             {% for m in campaign.metrics_table[:8] %}
             <tr>
               <td class="ind">{{ m.indicator }}</td>
-              <td class="val{% if m.highlight or (not _any_h and loop.last) %} warm{% endif %}">{{ m.value }}</td>
+              <td class="val{% if m.highlight %} warm{% endif %}">{{ m.value }}</td>
               <td class="note">{{ m.note }}</td>
             </tr>
             {% endfor %}
@@ -139,7 +138,7 @@
         {% set _real_insights = narrative.insights | reject('equalto', '') | list %}
         {% if _real_insights %}
         <div class="insights">
-          <h2>05. 인사이트 <small>Motiv's Value</small></h2>
+          <h2>05. 인사이트</h2>
           {% if _real_insights | length == 1 %}
             <p>{{ _real_insights[0] }}</p>
           {% else %}

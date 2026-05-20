@@ -118,11 +118,10 @@
             <tr><th style="width:38%">성과 지표</th><th style="width:24%">수치</th><th>비고</th></tr>
           </thead>
           <tbody>
-            {% set _any_h = (campaign.metrics_table | selectattr('highlight') | list | length) > 0 %}
             {% for m in campaign.metrics_table[:8] %}
             <tr>
               <td class="ind">{{ m.indicator }}</td>
-              <td class="val{% if m.highlight or (not _any_h and loop.last) %} warm{% endif %}">{{ m.value }}</td>
+              <td class="val{% if m.highlight %} warm{% endif %}">{{ m.value }}</td>
               <td class="note">{{ m.note }}</td>
             </tr>
             {% endfor %}
@@ -135,7 +134,7 @@
         {% set _real_insights = narrative.insights | reject('equalto', '') | list %}
         {% if _real_insights %}
         <div class="insights">
-          <h2>05. 인사이트 <small>Motiv's Value</small></h2>
+          <h2>05. 인사이트</h2>
           {% if _real_insights | length == 1 %}
             <p>{{ _real_insights[0] }}</p>
           {% else %}
