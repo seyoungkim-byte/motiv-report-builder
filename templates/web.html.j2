@@ -62,36 +62,39 @@
       </div>
       {% endif %}
 
-      {# bullet 규칙: 1개=paragraph, 2개+=bullets, string=옛 빌드 호환 #}
-      {% macro sec(num, title, items) %}
+      {# 블록 렌더: 항목 기본 = <p>, '- ' 시작 = 불릿. 연속 불릿은 자동 <ul>. #}
+      {% macro sec(num, title, blocks) %}
         <h2 class="sec"><span class="num">{{ num }}.</span>{{ title }}</h2>
-        {% if items is string %}
-          {% if items %}<p>{{ items }}</p>{% endif %}
-        {% elif items and items|length == 1 %}
-          <p>{{ items[0] }}</p>
-        {% elif items %}
-          <ul class="bul">
-            {% for it in items %}<li>{{ it }}</li>{% endfor %}
-          </ul>
+        {% if blocks is string %}
+          {% if blocks %}<p>{{ blocks }}</p>{% endif %}
+        {% elif blocks %}
+          {% for b in blocks %}
+            {% if b.kind == 'ul' %}
+              <ul class="bul">
+                {% for it in b['items'] %}<li>{{ it }}</li>{% endfor %}
+              </ul>
+            {% else %}
+              <p>{{ b.text }}</p>
+            {% endif %}
+          {% endfor %}
         {% endif %}
       {% endmacro %}
 
       {{ sec('01', '캠페인 목적',    narrative.overview)   }}
       {{ sec('02', '광고 집행 배경', narrative.background) }}
-
       <h2 class="sec"><span class="num">03.</span>적용 전략</h2>
       {% if narrative.strategy is string %}
         {% if narrative.strategy %}<p>{{ narrative.strategy }}</p>{% endif %}
       {% elif narrative.strategy %}
-        {% set strat = narrative.strategy %}
-        <p>{{ strat[0] }}</p>
-        {% if strat|length == 2 %}
-          <p>{{ strat[1] }}</p>
-        {% elif strat|length > 2 %}
-          <ul class="bul">
-            {% for it in strat[1:] %}<li>{{ it }}</li>{% endfor %}
-          </ul>
-        {% endif %}
+        {% for b in narrative.strategy %}
+          {% if b.kind == 'ul' %}
+            <ul class="bul">
+              {% for it in b['items'] %}<li>{{ it }}</li>{% endfor %}
+            </ul>
+          {% else %}
+            <p>{{ b.text }}</p>
+          {% endif %}
+        {% endfor %}
       {% endif %}
 
     </div>

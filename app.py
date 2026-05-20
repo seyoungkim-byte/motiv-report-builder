@@ -534,17 +534,19 @@ with col_l:
     st.session_state.narrative[TLDR_KEY] = []
 
     st.caption(
-        "💡 본문 내 핵심 phrase 는 `**텍스트**` 로 감싸면 자동으로 하이라이터 마커로 강조됩니다. "
-        "한 섹션당 1~2개 권장."
+        "💡 서식 규칙\n"
+        "  • 기본: 줄 단위로 한 단락 (불릿 없음). 줄바꿈 = 단락 구분.\n"
+        "  • 불릿이 필요한 줄만 맨 앞에 `- ` 접두사. 연속된 `- ` 줄은 자동으로 불릿 묶음.\n"
+        "  • 핵심 phrase 는 `**텍스트**` 로 감싸면 하이라이터 마커로 강조. 섹션당 1~2개 권장."
     )
 
     for key, label in NARRATIVE_SECTIONS:
         if key in BULLET_SECTIONS:
             st.text_area(
-                f"{label} — 한 줄에 한 불릿 (35~65자 단문)",
+                f"{label} — 한 줄에 한 항목 (불릿 원하면 줄 앞에 '- ')",
                 height=110,
                 key=f"nar_{key}",
-                help="만연체 금지. 단문 사실 1개씩.",
+                help="기본은 단락. '- ' 로 시작한 줄만 ▪ 불릿으로 렌더됩니다.",
             )
             st.session_state.narrative[key] = [
                 line.strip()

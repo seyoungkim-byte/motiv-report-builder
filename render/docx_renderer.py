@@ -101,29 +101,35 @@ def render_press_docx(context: dict[str, Any], out_path: Path) -> Path:
         if pos < len(text):
             paragraph.add_run(text[pos:])
 
+    # 불릿 마커 규칙 (html_renderer 와 동일):
+    #   '- ' / '* ' / '▪ ' / '• ' 시작 = 불릿. 그 외 = paragraph.
+    _BULLET_PREFIXES = ("- ", "* ", "▪ ", "• ")
+
+    def _strip_bullet(s: str) -> tuple[bool, str]:
+        for p in _BULLET_PREFIXES:
+            if s.startswith(p):
+                return True, s[len(p):].lstrip()
+        return False, s
+
     for key, title_text in [
         ("overview", "01. 캠페인 목적"),
         ("background", "02. 광고 집행 배경"),
         ("strategy", "03. 적용 전략"),
     ]:
         raw = narrative.get(key)
-        # 새 스키마 = list[str] 불릿, 옛 스키마 = str 단락. 둘 다 흡수.
         if isinstance(raw, list):
             items = [str(x).strip() for x in raw if str(x).strip()]
             if not items:
                 continue
             _heading(doc, title_text, size=13)
-            # strategy 의 첫 항목은 lead-in 단락 (불릿 X), 나머지만 불릿
-            if key == "strategy" and len(items) >= 1:
-                p = doc.add_paragraph()
-                _add_runs_with_bold(p, items[0])
-                for item in items[1:]:
+            for item in items:
+                is_bul, text = _strip_bullet(item)
+                if is_bul:
                     bp = doc.add_paragraph(style="List Bullet")
-                    _add_runs_with_bold(bp, item)
-            else:
-                for item in items:
-                    p = doc.add_paragraph(style="List Bullet")
-                    _add_runs_with_bold(p, item)
+                    _add_runs_with_bold(bp, text)
+                else:
+                    p = doc.add_paragraph()
+                    _add_runs_with_bold(p, text)
         else:
             body = (raw or "").strip() if isinstance(raw, str) else ""
             if not body:
@@ -152,8 +158,13 @@ def render_press_docx(context: dict[str, Any], out_path: Path) -> Path:
     if insights:
         _heading(doc, "05. 인사이트", size=13)
         for item in insights:
-            p = doc.add_paragraph(style="List Bullet")
-            _add_runs_with_bold(p, str(item))
+            text = str(item)
+            _, text = _strip_bullet(text)  # 사용자가 - 붙였어도 안전 제거
+            if len(insights) == 1:
+                p = doc.add_paragraph()
+            else:
+                p = doc.add_paragraph(style="List Bullet")
+            _add_runs_with_bold(p, text)
 
     doc.add_paragraph()
     _heading(doc, f"About {s.company_name}", level=3, size=11)

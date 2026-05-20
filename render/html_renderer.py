@@ -12,6 +12,8 @@ from .jinja_env import build_env
 
 
 _BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
+# 항목이 '- ' / '* ' / '▪ ' 로 시작하면 명시적 불릿. 그 외 = paragraph.
+_BULLET_PREFIXES = ("- ", "* ", "▪ ", "• ")
 
 
 def _css(name: str) -> str:
@@ -50,11 +52,77 @@ def _md_to_safe_html(value: Any) -> Any:
         return Markup(str(value))
 
 
+def _is_bullet_line(s: str) -> bool:
+    return isinstance(s, str) and any(s.startswith(p) for p in _BULLET_PREFIXES)
+
+
+def _strip_bullet_prefix(s: str) -> str:
+    """`- 텍스트` → `텍스트` (불릿 마커 제거). 마커 없으면 원본."""
+    for p in _BULLET_PREFIXES:
+        if s.startswith(p):
+            return s[len(p):].lstrip()
+    return s
+
+
+def _to_blocks(items: Any) -> list[dict[str, Any]]:
+    """list[str] → [{kind: 'p', text: Markup} | {kind: 'ul', items: [Markup,...]}]
+
+    명시 규칙:
+      - '- ' / '* ' / '▪ ' / '• ' 로 시작 = 불릿 항목
+      - 그 외 = paragraph 항목
+    연속된 불릿 항목은 하나의 <ul> 로 묶이고, 그 사이 일반 항목은 <p> 로.
+    """
+    if not isinstance(items, list):
+        return []
+    blocks: list[dict[str, Any]] = []
+    cur_ul: list[Any] = []
+
+    def _flush_ul():
+        nonlocal cur_ul
+        if cur_ul:
+            blocks.append({"kind": "ul", "items": cur_ul})
+            cur_ul = []
+
+    for raw in items:
+        if not isinstance(raw, str):
+            # 이미 변환된 Markup 일 수도. str 로 강제 후 검사.
+            try:
+                raw_s = str(raw)
+            except Exception:
+                continue
+        else:
+            raw_s = raw
+        raw_s = raw_s.strip()
+        if not raw_s:
+            continue
+        if _is_bullet_line(raw_s):
+            cur_ul.append(_md_to_safe_html(_strip_bullet_prefix(raw_s)))
+        else:
+            _flush_ul()
+            blocks.append({"kind": "p", "text": _md_to_safe_html(raw_s)})
+    _flush_ul()
+    return blocks
+
+
+# 새 블록 구조를 사용하는 narrative 필드 (template 이 blocks 로 받음)
+_BLOCK_FIELDS = {"overview", "background", "strategy"}
+
+
 def _enrich_narrative(nar: dict[str, Any]) -> dict[str, Any]:
     """narrative dict 의 모든 string 값을 _md_to_safe_html 로 변환.
-    list[str] 항목은 항목별 변환. 원본 dict 는 그대로 두고 새 dict 반환."""
+    overview/background/strategy 는 추가로 _to_blocks 로 그룹화 — 템플릿이
+    {kind: 'p'|'ul', ...} 블록 단위로 렌더. insights 는 항상 list[str] 유지
+    (별도 박스 안에서 단순 ul 또는 p 처리)."""
     out: dict[str, Any] = {}
     for k, v in (nar or {}).items():
+        if k in _BLOCK_FIELDS and isinstance(v, list):
+            out[k] = _to_blocks(v)
+            # 원본 list 도 같은 키 _items 로 노출 — docx/txt renderer 용
+            out[f"{k}_items"] = [
+                _md_to_safe_html(_strip_bullet_prefix(x)) if isinstance(x, str) else x
+                for x in v
+            ]
+            continue
         if isinstance(v, str):
             out[k] = _md_to_safe_html(v)
         elif isinstance(v, list):
