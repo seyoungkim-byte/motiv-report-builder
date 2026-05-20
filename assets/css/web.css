@@ -3,16 +3,16 @@
 :root {
   --ink: #1f2419;
   --muted: #6e6a5e;
-  --olive-vivid: #7fa84a;
-  --olive-dark:  #3d4823;
-  --olive-deep:  #2d3818;
-  --olive-soft:  #eef2dd;
+  --olive-vivid: #1E5EFF;
+  --olive-dark:  #0040C9;
+  --olive-deep:  #0a1f7a;
+  --olive-soft:  #E8EFFF;
   --amber:       #e8a23a;
   --amber-soft:  #fff5e1;
   --coral:       #d76e3e;
   --coral-soft:  #fde9e1;
-  --cream:       #faf6ec;
-  --ivory:       #fcfaf2;
+  --cream:       #F4F7FF;
+  --ivory:       #F8FAFF;
   --paper:       #ffffff;
   --line:        #e6e2d4;
   --max: 760px;
@@ -20,7 +20,7 @@
 * { box-sizing: border-box; }
 body {
   margin: 0;
-  background: #ece4d3;
+  background: #DDE3EE;
   color: var(--ink);
   font: 15px/1.65 "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI",
                   "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
@@ -43,7 +43,7 @@ body {
   align-items: stretch;
   margin: -36px -40px 24px;          /* note padding 만큼 negative */
   border-left: 12px solid var(--olive-vivid);
-  background: #f7f1e1;
+  background: #F4F7FF;
   min-height: 320px;
   overflow: hidden;
 }
@@ -121,7 +121,7 @@ body {
 .hero__img {
   width: 100%;
   height: 100%;
-  background-color: #2d2218;
+  background-color: #0a1f7a;
   background-size: cover;
   background-position: center;
   position: relative;
@@ -130,7 +130,7 @@ body {
 .hero__img--placeholder {
   background:
     radial-gradient(circle at 30% 30%, rgba(255,255,255,.22) 0%, transparent 45%),
-    linear-gradient(135deg, #4d3320 0%, #8b6b4c 50%, #c9a961 100%);
+    linear-gradient(135deg, #0a1f7a 0%, #1E5EFF 50%, #6B9DFF 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -172,7 +172,7 @@ body {
 .summary p strong {
   color: var(--olive-dark);
   font-weight: 800;
-  background: linear-gradient(transparent 60%, rgba(127,168,74,0.22) 60%);
+  background: linear-gradient(transparent 60%, rgba(30,94,255,0.22) 60%);
   padding: 0 1px;
 }
 
@@ -221,7 +221,7 @@ ul.bul li::before {
 ul.bul li strong {
   color: var(--olive-dark);
   font-weight: 700;
-  background: linear-gradient(transparent 60%, rgba(127,168,74,0.22) 60%);
+  background: linear-gradient(transparent 60%, rgba(30,94,255,0.22) 60%);
   padding: 0 1px;
 }
 ul.bul li:last-child { padding-bottom: 0; }
