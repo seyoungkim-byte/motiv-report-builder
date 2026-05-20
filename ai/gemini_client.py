@@ -35,6 +35,17 @@ def generate_image_bytes(prompt: str) -> bytes:
     inline image part in the response (text-only is the default).
     """
     s = _configure()
+    # 사전 검사: imagen-* 계열은 generate_content 로 호출 불가 (별도 /predict 엔드포인트).
+    # 사용자가 옛 default 값을 Streamlit Secrets 에 명시해두면 코드 default 가 덮어써져서
+    # 매번 silent fail 함. 명시적으로 안내하고 호출 자체를 막는다.
+    if "imagen" in s.gemini_image_model.lower():
+        raise RuntimeError(
+            f"GEMINI_IMAGE_MODEL='{s.gemini_image_model}' 은 generate_content API 와 "
+            "호환되지 않습니다 (imagen 계열은 별도 /predict 엔드포인트 전용).\n\n"
+            "조치: Streamlit Cloud → 앱 Settings → Secrets 에서\n"
+            "  GEMINI_IMAGE_MODEL = \"gemini-2.5-flash-image-preview\"\n"
+            "로 변경하거나, 그 줄을 통째로 삭제하세요 (코드 default 가 적용됨)."
+        )
     model = genai.GenerativeModel(s.gemini_image_model)
 
     resp = model.generate_content(

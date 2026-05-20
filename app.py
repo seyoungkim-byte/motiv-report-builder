@@ -989,6 +989,21 @@ with col_r:
             )
             st.stop()
 
+        # Stale hero path 정리 — 옛 빌드 load 직후의 path 가 더 이상 디스크에 없거나
+        # 0 byte 면 새로 생성해야 함. (Streamlit Cloud 는 컨테이너 재시작 시 output/
+        # 디렉터리가 휘발됨.)
+        _hp = st.session_state.get("hero_path")
+        if _hp:
+            try:
+                _hp_path = Path(_hp)
+                if not _hp_path.exists() or _hp_path.stat().st_size == 0:
+                    st.session_state.hero_path = None
+                    st.caption(
+                        "ℹ️ 직전 빌드의 히어로 이미지 파일이 사라져 새로 생성합니다."
+                    )
+            except Exception:
+                st.session_state.hero_path = None
+
         # Hero image auto-fallback — 사용자가 명시적으로 생성 안 했고 토글 ON 이면
         # Gemini 호출로 한 번 시도. 실패해도 빌드는 계속 (placeholder 로).
         if _auto_hero and not st.session_state.get("hero_path"):
@@ -1021,6 +1036,16 @@ with col_r:
                         "   - 또는 캠페인 industry/channel 텍스트가 필터에 걸렸을 수 있음\n"
                     )
                     st.code(str(e), language="text")
+
+        # 히어로 이미지 상태 한 줄 표시 — 빌드마다 placeholder 인지 실제 이미지인지 명확하게.
+        _hp_final = st.session_state.get("hero_path")
+        if _hp_final and Path(_hp_final).exists() and Path(_hp_final).stat().st_size > 0:
+            st.caption(f"🖼️ 히어로 이미지: `{Path(_hp_final).name}` 사용")
+        elif not _auto_hero:
+            st.caption("🖼️ 히어로 이미지: 자동 생성 토글 OFF — placeholder 로 빌드")
+        else:
+            st.caption("🖼️ 히어로 이미지: placeholder 로 빌드 (생성 실패 또는 미설정)")
+
         # materialize the edited metrics back into the campaign payload.
         # _kpi / _table 체크박스 분리 — 상단 KPI 스트립과 04 표가 서로 다른
         # 부분집합/순서를 가질 수 있게.

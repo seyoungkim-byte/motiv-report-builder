@@ -161,7 +161,9 @@ body {
 
 /* ─── Section headings ──────────────────────────────── */
 .sec {
-  margin: 2.8mm 0 1.5mm;
+  margin: 6mm 0 2mm;                  /* was 2.8mm — 챕터 간 호흡 더 */
+  padding-top: 2mm;                   /* 위 가는 hairline 자리 */
+  border-top: 0.2mm solid #e6e2d4;    /* subtle 구분선 */
   font-size: 10.5pt;
   font-weight: 800;
   color: #1f2419;
@@ -169,13 +171,21 @@ body {
   align-items: baseline;
   gap: 1.5mm;
 }
+/* 첫 섹션은 위 hairline 안 그려 깔끔하게 (요약 박스 바로 아래) */
+.body__left .sec:first-child,
+.body__right .sec:first-child,
+.summary + .sec {
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 0;
+}
 .sec .num {
   color: #7fa84a;
   font-weight: 800;
   font-size: 9.5pt;
 }
-.sec--right { margin-top: 0; }
-.body__left .sec:first-child, .body__right .sec:first-child { margin-top: 0; }
+.sec--right { margin-top: 0; padding-top: 0; border-top: 0; }
+/* (위에서 hairline 제거 룰 처리 — 중복 방지로 추가 규칙 X) */
 
 /* ─── Paragraphs + bullets ──────────────────────────── */
 .body p {

@@ -170,7 +170,9 @@ body {
 }
 
 .sec {
-  margin: 18px 0 8px;
+  margin: 32px 0 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
   font-size: 16px;
   font-weight: 800;
   color: var(--ink);
@@ -179,7 +181,14 @@ body {
   gap: 8px;
 }
 .sec .num { color: var(--olive-vivid); font-weight: 800; font-size: 15px; }
-.sec--right { margin-top: 0; }
+.sec--right { margin-top: 0; padding-top: 0; border-top: 0; }
+.body__left .sec:first-child,
+.body__right .sec:first-child,
+.summary + .sec {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
 .body__left .sec:first-child, .body__right .sec:first-child { margin-top: 0; }
 
 .body p { margin: 0 0 8px; font-size: 14px; line-height: 1.6; color: var(--ink); }
