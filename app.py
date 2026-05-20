@@ -21,8 +21,6 @@ from ai import (
     NARRATIVE_SECTIONS,
     generate_hero_image,
     generate_narrative,
-    plan_charts,
-    plan_chart_candidates,
 )
 from ai.narrative import (
     BULLET_SECTIONS,
@@ -31,12 +29,11 @@ from ai.narrative import (
     TLDR_KEY,
     TLDR_LABEL,
 )
-from viz import render_chart, TEMPLATE_NAMES
 from auth import logout, require_auth
 from config import load_settings
 from data import (
     CampaignData, CampaignRepository, MetricRow,
-    load_build, save_build,
+    load_build, save_build, last_storage_error,
     get_setting, set_setting,
 )
 from render import (
@@ -156,8 +153,6 @@ def _reset_campaign_state(data: CampaignData):
         [{"indicator": m.indicator, "value": m.value, "note": m.note} for m in data.metrics_table]
     )
     _df["_select"] = False
-    # 기본 상단 KPI 카드 = 첫 4행 (사용자가 체크박스로 재선택 가능, 최대 4)
-    _df["_kpi"]    = [i < 4 for i in range(len(_df))]
     # 기본 04 표 = 전체 노출 (사용자가 빼고 싶으면 체크 해제)
     _df["_table"]  = True
     st.session_state.metrics_df = _df
@@ -174,10 +169,6 @@ def _reset_campaign_state(data: CampaignData):
     st.session_state.subhead = ""
     st.session_state.hero_path = None
     st.session_state.last_build = None
-    # 차트 후보 / 선택도 캠페인마다 리셋 — 옛 후보가 새 캠페인에 섞이면 사고
-    st.session_state.chart_candidates = []
-    st.session_state.chart_selected = set()
-    st.session_state.chart_instruction = ""
     # Header 메타도 캠페인 단위로 리셋
     st.session_state.hdr_media_products = ""
     st.session_state.hdr_measurement = ""
@@ -218,17 +209,15 @@ def _reset_campaign_state(data: CampaignData):
         st.session_state["nar_tldr"] = "\n".join(nar.get(TLDR_KEY, []))
 
     # metrics_table 도 saved build 에서 복원 — 사용자가 수기로 편집한 indicator/
-    # value/note 와 _kpi/_table 체크 상태를 보존.
-    # 옛 빌드 (마이그레이션 이전 stale 라벨) 가 살아날 위험은 있지만, 사용자가
-    # 편집모드 안의 [🔄 카탈로그에서 새로고침] 으로 원하는 시점에 재설정 가능.
+    # value/note 와 _table 체크 상태를 보존.
     saved_metrics = src.get("metrics_table") or []
     if saved_metrics:
         saved_df = pd.DataFrame(saved_metrics)
-        # 컬럼 보장 — 옛 빌드는 _kpi/_table 없으니 기본값 자동 부착
+        # 컬럼 보장 + 옛 빌드 잔존 컬럼(_kpi) 제거
+        if "_kpi" in saved_df.columns:
+            saved_df = saved_df.drop(columns=["_kpi"])
         if "_select" not in saved_df.columns:
             saved_df["_select"] = False
-        if "_kpi" not in saved_df.columns:
-            saved_df["_kpi"] = [i < 4 for i in range(len(saved_df))]
         if "_table" not in saved_df.columns:
             saved_df["_table"] = True
         st.session_state.metrics_df = saved_df
@@ -642,14 +631,12 @@ with col_r:
     # 컬럼 보장 (표시·편집 양쪽에서 사용)
     if st.session_state.metrics_df is None:
         st.session_state.metrics_df = pd.DataFrame(
-            columns=["indicator", "value", "note", "_select", "_kpi", "_table"]
+            columns=["indicator", "value", "note", "_select", "_table"]
         )
     else:
         df_cur = st.session_state.metrics_df
         if "_select" not in df_cur.columns:
             df_cur["_select"] = False
-        if "_kpi" not in df_cur.columns:
-            df_cur["_kpi"] = [i < 4 for i in range(len(df_cur))]
         if "_table" not in df_cur.columns:
             df_cur["_table"] = True
 
@@ -657,13 +644,11 @@ with col_r:
         st.info("좌측에서 캠페인을 로드하면 카탈로그 기반 성과 지표가 자동으로 채워집니다.")
     elif not _in_edit:
         # ── 표시 모드 (read-only) ──
-        # _select 는 편집 모드 전용이라 숨김
         _display_df = st.session_state.metrics_df
-        _cols = [c for c in ["_kpi", "_table", "indicator", "value", "note"] if c in _display_df.columns]
+        _cols = [c for c in ["_table", "indicator", "value", "note"] if c in _display_df.columns]
         st.dataframe(
             _display_df[_cols],
             column_config={
-                "_kpi":   st.column_config.CheckboxColumn("KPI", disabled=True, width="small"),
                 "_table": st.column_config.CheckboxColumn("표",  disabled=True, width="small"),
                 "indicator": st.column_config.TextColumn("성과 지표"),
                 "value":     st.column_config.TextColumn("성과"),
@@ -674,9 +659,6 @@ with col_r:
         )
     else:
         # ── 편집 모드 ──
-        # 편집 중에는 session_state.metrics_df 에 사후 쓰기 금지.
-        # data_editor 의 key= 가 자체 캐시(edited_rows/added_rows)를 유지하므로
-        # 모든 입력은 `edited` (return value) 에 누적됨. 저장 클릭 시 commit.
         edited = st.data_editor(
             st.session_state.metrics_df,
             num_rows="dynamic",
@@ -684,26 +666,15 @@ with col_r:
             column_config={
                 "_select":   st.column_config.CheckboxColumn("↕",  width="small",
                                 help="체크 후 아래 ▲▼ 로 행 이동"),
-                "_kpi":      st.column_config.CheckboxColumn("KPI", width="small",
-                                help="상단 4-카드 KPI 스트립 노출. 최대 4개. 체크된 행 순서대로."),
                 "_table":    st.column_config.CheckboxColumn("표",  width="small",
                                 help="04 캠페인 성과 표 노출. 체크된 행 순서대로."),
                 "indicator": st.column_config.TextColumn("성과 지표"),
                 "value":     st.column_config.TextColumn("성과"),
                 "note":      st.column_config.TextColumn("비고"),
             },
-            column_order=["_select", "_kpi", "_table", "indicator", "value", "note"],
+            column_order=["_select", "_table", "indicator", "value", "note"],
             key="metrics_editor",
         )
-
-        # KPI 5개 이상 경고
-        if "_kpi" in edited.columns:
-            _kpi_n = int(edited["_kpi"].fillna(False).sum())
-            if _kpi_n > 4:
-                st.warning(
-                    f"⚠️ KPI 카드 최대 4개 — 현재 {_kpi_n}개 체크. "
-                    "저장 후 빌드 시 첫 4개만 반영. 직접 체크 해제 권장."
-                )
 
         # ── 행 이동 + 저장 / 취소 (편집 모드 전용) ──
         _bcols = st.columns([0.13, 0.13, 0.13, 0.30, 0.30])
@@ -764,7 +735,6 @@ with col_r:
                 [{"indicator": m.indicator, "value": m.value, "note": m.note} for m in campaign.metrics_table]
             )
             fresh_df["_select"] = False
-            fresh_df["_kpi"]    = [i < 4 for i in range(len(fresh_df))]
             fresh_df["_table"]  = True
             st.session_state.metrics_df = fresh_df
             if "metrics_editor" in st.session_state:
@@ -816,94 +786,7 @@ with col_r:
         st.image(st.session_state.hero_path)
 
     st.divider()
-    st.subheader("6. 차트 큐레이션 (선택)")
-    st.caption(
-        "비워두면 빌드 시 AI 가 자동으로 0~2개 선택. 직접 고르려면 아래에서 "
-        "후보를 받아 체크하세요."
-    )
-    _instr = st.text_area(
-        "Claude 에게 추가 지시 (선택)",
-        key="chart_instruction",
-        height=80,
-        placeholder=(
-            "예: '구매 성장률은 vertical_pair 로 보여줘'\n"
-            "예: 'donut 은 빼고 funnel 위주로'\n"
-            "예: 'index_lift 1개만 추천'"
-        ),
-        help="비워두면 일반 후보 추천. 입력하면 Claude 가 이 지시를 따릅니다.",
-    )
-    if st.button("🎨 차트 후보 받기 (4~5개)", key="chart_candidates_btn"):
-        with st.spinner("후보 큐레이션 + 미리보기 렌더 중..."):
-            dbg: dict = {}
-            cands = plan_chart_candidates(
-                campaign.to_prompt_dict(),
-                st.session_state.narrative,
-                campaign_context_prose=st.session_state.context_prose,
-                extra_analysis=st.session_state.extra_analysis,
-                user_instruction=_instr,
-                debug=dbg,
-            )
-            previews: list[dict] = []
-            for spec in cands:
-                try:
-                    spec["image_b64"] = render_chart(spec["template"], spec["data"])
-                    previews.append(spec)
-                except Exception as e:
-                    st.warning(f"후보 '{spec.get('title')}' 렌더 실패: {e}")
-            st.session_state.chart_candidates = previews
-            # 기본 선택: 상위 2개 자동 체크 (사용자가 원하면 3개까지 수동 가능)
-            st.session_state.chart_selected = set(range(min(2, len(previews))))
-            if not previews:
-                st.warning(
-                    f"후보 0개 — 사유: {dbg.get('reason','?')} / {dbg.get('detail','')}"
-                )
-                with st.expander("🔍 원응답 (앞 800자)"):
-                    st.code(dbg.get("raw", "(없음)"))
-
-    # 후보 그리드 — 체크박스 + 프리뷰 + 메타
-    cands = st.session_state.get("chart_candidates") or []
-    if cands:
-        st.caption(f"총 {len(cands)}개 후보. 0~2개 체크해서 빌드에 포함.")
-        selected: set = st.session_state.get("chart_selected", set())
-        # 최대 2개 강제
-        for i, c in enumerate(cands):
-            cols = st.columns([0.08, 0.92])
-            checked_now = cols[0].checkbox(
-                "", value=(i in selected), key=f"cand_{i}",
-                label_visibility="collapsed",
-            )
-            if checked_now:
-                selected.add(i)
-            else:
-                selected.discard(i)
-            with cols[1]:
-                st.markdown(
-                    f"**{c.get('title','(제목 없음)')}**  "
-                    f"_<span style='color:#7d8c4e'>{c.get('template','')}</span>_",
-                    unsafe_allow_html=True,
-                )
-                if c.get("image_b64"):
-                    import base64
-                    st.image(base64.b64decode(c["image_b64"]), width=420)
-                if c.get("caption"):
-                    st.caption(c["caption"])
-                st.markdown("---")
-        # 3개 캡 강제 — 4개 이상 체크 시 나중 것 cut
-        if len(selected) > 3:
-            selected = set(sorted(selected)[:3])
-            st.warning("⚠️ 최대 3개까지만 빌드에 포함됩니다. 나머지는 자동 해제됨.")
-        st.session_state.chart_selected = selected
-        if selected:
-            note = (
-                f"✅ {len(selected)}/3 개 선택됨"
-                + (" (3개 시 가로 3열로 압축됨)" if len(selected) >= 3 else "")
-            )
-            st.success(note)
-        else:
-            st.info("체크된 후보가 없습니다 — 빌드 시 AI 자동 픽으로 폴백.")
-
-    st.divider()
-    st.subheader("7. 산출물 생성")
+    st.subheader("6. 산출물 생성")
     out_dir: Path = settings.output_dir / campaign.campaign_no
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -955,16 +838,6 @@ with col_r:
             warns.append(f"04 성과 지표 {n_rows}행 → 7행 이하 권장 (우측 표가 본문보다 너무 길어짐)")
             score += 1
 
-        n_charts = len(st.session_state.get("chart_selected") or set())
-        if n_charts == 0:
-            # 자동 픽 fallback — 보통 2개. 충만도 추정에 2개 가정
-            est_charts = 2
-        else:
-            est_charts = n_charts
-        if est_charts >= 3 and (ins_total > 250 or n_rows > 6):
-            warns.append(f"차트 3개 + 인사이트/성과표가 길어 잘림 위험")
-            score += 1
-
         # 거친 fill % 계산 (모든 본문 + 차트 영역의 mm 합 ÷ 가용)
         # 라인당 ~5.5mm, 본문 width ~85mm 기준 한 줄 ~45자
         def lines(chars: int, w: int = 45) -> float:
@@ -978,9 +851,8 @@ with col_r:
         side_table_mm = 12 + n_rows * 7
         body_grid_mm = max(body_left_mm, side_table_mm) + 18  # 헤더들
         insights_mm = 12 + ins_count * 11 + (ins_total / 60) * 2
-        charts_mm   = (32 if est_charts <= 2 else 28) + 8
-        fixed_mm    = 110  # 헤더띠+타이틀+메타+태그+TL;DR+KPI+요약+푸터 합
-        total_mm    = fixed_mm + body_grid_mm + insights_mm + charts_mm
+        fixed_mm    = 110  # 헤더띠+타이틀+메타+요약+푸터 합
+        total_mm    = fixed_mm + body_grid_mm + insights_mm
         available_mm = 281
         fill = int(total_mm / available_mm * 100)
         return score, warns, fill
@@ -1090,8 +962,7 @@ with col_r:
             st.caption("🖼️ 히어로 이미지: placeholder 로 빌드 (생성 실패 또는 미설정)")
 
         # materialize the edited metrics back into the campaign payload.
-        # _kpi / _table 체크박스 분리 — 상단 KPI 스트립과 04 표가 서로 다른
-        # 부분집합/순서를 가질 수 있게.
+        # '표' 체크박스(_table) 만 사용 — KPI 스트립은 제거됨.
         df = st.session_state.metrics_df
         if df is None:
             df = pd.DataFrame(columns=["indicator", "value", "note"])
@@ -1106,73 +977,9 @@ with col_r:
                 value=str(r.get("value", "")).strip(),
                 note=str(r.get("note", "")).strip(),
             )
-        # 04 표 = _table 체크된 행 (옛 빌드 호환: 컬럼 없으면 모두 포함)
+        # 04 표 = '표' 체크박스가 켜진 행만 (옛 빌드 호환: 컬럼 없으면 모두 포함)
         table_records = [r for r in valid_records if r.get("_table", True)]
         campaign.metrics_table = [_to_row(r) for r in table_records]
-        # KPI 스트립 = _kpi 체크된 행 (옛 빌드 호환: 컬럼 없으면 첫 4행)
-        kpi_records = [r for r in valid_records if r.get("_kpi", False)][:4]
-        if not kpi_records:
-            kpi_records = valid_records[:4]
-        kpi_table_rows = [_to_row(r) for r in kpi_records]
-
-        # Chart selection path — prefer user-curated candidates, fall back
-        # to auto plan_charts() when the user hasn't run candidate mode.
-        chart_set: list[dict] = []
-        chart_debug: dict = {}
-        user_cands = st.session_state.get("chart_candidates") or []
-        user_picks = st.session_state.get("chart_selected") or set()
-
-        if user_cands and user_picks:
-            # User curated path — use only checked candidates (already pre-rendered)
-            ordered = sorted(user_picks)[:2]
-            for idx in ordered:
-                if 0 <= idx < len(user_cands):
-                    chart_set.append(user_cands[idx])
-            chart_debug.update(
-                reason="user_curated",
-                detail=f"selected {len(chart_set)}/{len(user_cands)} candidates",
-            )
-        else:
-            # Auto path — old behavior, AI silently picks up to 2
-            try:
-                with st.spinner("차트 큐레이션 중 (Claude)..."):
-                    planned = plan_charts(
-                        campaign.to_prompt_dict(),
-                        st.session_state.narrative,
-                        campaign_context_prose=st.session_state.context_prose,
-                        extra_analysis=st.session_state.extra_analysis,
-                        debug=chart_debug,
-                    )
-                for spec in planned:
-                    try:
-                        img_b64 = render_chart(spec["template"], spec["data"])
-                        chart_set.append({**spec, "image_b64": img_b64})
-                    except Exception as e:
-                        st.warning(f"차트 '{spec.get('title')}' 렌더 실패: {e}")
-            except Exception as e:
-                st.warning(f"차트 큐레이션 단계 실패 (테이블로 폴백): {e}")
-
-        # Visible status: who/what decided there were no charts.
-        if chart_set:
-            mode = "사용자 큐레이션" if chart_debug.get("reason") == "user_curated" else "AI 자동 픽"
-            st.success(f"📈 차트 {len(chart_set)}개 생성 ({mode}) → 04 영역에 반영")
-        else:
-            reason = chart_debug.get("reason", "unknown")
-            detail = chart_debug.get("detail", "")
-            label = {
-                "api_error":      "Anthropic API 호출 실패",
-                "no_text":        "Claude 응답에 텍스트 없음",
-                "json_error":     "Claude 응답 JSON 파싱 실패",
-                "charts_not_list":"Claude 응답 스키마 불일치",
-                "validated":      "Claude 가 0개 반환 (데이터 근거 부족 판단)",
-                "unknown":        "사유 미상",
-            }.get(reason, reason)
-            st.info(
-                f"📊 차트 0개 — {label}. 04 영역은 기존 성과 표로 렌더됩니다.\n\n"
-                f"디테일: `{detail}`"
-            )
-            with st.expander("🔍 chart_planner 원응답 (앞 600자)"):
-                st.code(chart_debug.get("raw", "(없음)"))
 
         # Header meta — DB 자동값 + 사용자 입력 합쳐서 한 dict 로
         header_tags = [
@@ -1211,14 +1018,7 @@ with col_r:
             "subhead": st.session_state.subhead,
             "campaign": asdict(campaign),
             "narrative": st.session_state.narrative,
-            "chart_set": chart_set,
             "header_meta": header_meta,
-            # KPI 스트립 전용 — 사용자가 _kpi 체크박스로 선택한 행만, 최대 4개.
-            # 04 표는 campaign.metrics_table 그대로 (이미 _table 필터 적용됨).
-            "kpi_table": [
-                {"indicator": r.indicator, "value": r.value, "note": r.note}
-                for r in kpi_table_rows
-            ],
             "hero_image_url": Path(st.session_state.hero_path).as_uri()
             if st.session_state.hero_path
             else None,
@@ -1290,7 +1090,12 @@ with col_r:
         if ok:
             st.success(f"완료 → {out_dir}  ·  Supabase 에 저장됨 (다음 접속 때 자동 복원)")
         else:
-            st.warning(f"완료 → {out_dir}  ·  ⚠️ Supabase 저장 실패 (다운로드는 이번 세션에서 가능)")
+            _err = last_storage_error() or "(원인 미상)"
+            st.warning(
+                f"완료 → {out_dir}  ·  ⚠️ Supabase 저장 실패 (다운로드는 이번 세션에서 가능)"
+            )
+            with st.expander("🔍 저장 실패 원인", expanded=True):
+                st.code(_err, language="text")
 
     # 빌드 결과 다운로드 영역 — 버튼 핸들러 밖에 있어서 rerun 후에도 유지
     last = st.session_state.get("last_build")
