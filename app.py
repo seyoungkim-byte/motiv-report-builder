@@ -34,7 +34,11 @@ from ai.narrative import (
 from viz import render_chart, TEMPLATE_NAMES
 from auth import logout, require_auth
 from config import load_settings
-from data import CampaignData, CampaignRepository, MetricRow, load_build, save_build
+from data import (
+    CampaignData, CampaignRepository, MetricRow,
+    load_build, save_build,
+    get_setting, set_setting,
+)
 from render import (
     html_to_pdf,
     render_press_docx,
@@ -396,6 +400,48 @@ with col_l:
         )
 
     st.subheader("3. 캠페인 컨텍스트 & 내러티브")
+
+    # ── 톤 가이드 — 모든 캠페인 공통 (Supabase app_settings 저장) ──
+    # 한 번 설정하면 마케팅 팀 누구든 같은 톤으로 생성. 캠페인 무관 영구.
+    if "tone_guide" not in st.session_state:
+        st.session_state["tone_guide"] = get_setting("tone_guide", "")
+    with st.expander(
+        "🎨 톤 가이드 (모든 캠페인 공통)" + (
+            " — ✅ 설정됨" if st.session_state["tone_guide"].strip()
+            else " — ⚪ 비어있음"
+        ),
+        expanded=False,
+    ):
+        st.caption(
+            "여기 적은 톤·문체·표현 규칙은 모든 캠페인의 Claude 초안 생성에 자동 적용됩니다. "
+            "회사 통일 톤이므로 한 번 설정 후 거의 안 건드려도 됩니다."
+        )
+        st.text_area(
+            "톤 가이드",
+            key="tone_guide",
+            height=180,
+            placeholder=(
+                "예시:\n"
+                "- 과장어 절대 금지 ('폭발적', '획기적', '압도적' 등)\n"
+                "- 한 문장은 60자 이하로 끊어주세요\n"
+                "- 모든 섹션 첫 문장은 명사로 시작 (예: '카테고리 최성수기에...')\n"
+                "- 영문 약어는 한 번만 풀이 후 약어 사용 (예: CTV(Connected TV))\n"
+                "- 수치는 본문에 한 번만 — 표·차트가 보여주는 건 본문에서 다시 안 읊음"
+            ),
+            label_visibility="collapsed",
+        )
+        col_a, col_b = st.columns([1, 4])
+        with col_a:
+            if st.button("💾 저장", key="tone_guide_save", help="Supabase에 저장 — 다른 사용자 세션에도 즉시 반영"):
+                if set_setting("tone_guide", st.session_state["tone_guide"]):
+                    st.success("저장 완료")
+                else:
+                    st.error("저장 실패 — Supabase 연결 확인")
+        with col_b:
+            if st.button("🔄 서버에서 다시 불러오기", key="tone_guide_reload"):
+                st.session_state["tone_guide"] = get_setting("tone_guide", "")
+                st.rerun()
+
     st.text_area(
         "캠페인 컨텍스트 (자유 서술 — Claude가 1차 사실로 사용)",
         key="context_prose",
@@ -438,6 +484,7 @@ with col_l:
                     campaign.to_prompt_dict(),
                     campaign_context_prose=st.session_state.context_prose,
                     extra_analysis=st.session_state.extra_analysis,
+                    tone_guide=st.session_state.get("tone_guide", ""),
                 )
                 st.session_state.narrative = result
                 # Push generated values into the widget-bound keys so the

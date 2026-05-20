@@ -179,6 +179,7 @@ def generate_narrative(
     *,
     campaign_context_prose: str = "",
     extra_analysis: str = "",
+    tone_guide: str = "",
 ) -> dict[str, Any]:
     """Generate the 5-section narrative draft.
 
@@ -215,6 +216,27 @@ def generate_narrative(
     parts.append("[지시] 위 [작성 규칙]에 따라 6개 필드 (tldr/summary/overview/background/strategy/insights) JSON 을 작성하세요.")
     prose_text = "\n\n".join(parts)
 
+    # tone_guide 는 cache 깨지지 않게 별도 system block 으로 *뒤에* 둔다.
+    # 메인 SYSTEM_PROMPT 는 ephemeral cache 그대로 유지, tone block 만 volatile.
+    system_blocks: list[dict[str, Any]] = [
+        {
+            "type": "text",
+            "text": SYSTEM_PROMPT,
+            "cache_control": {"type": "ephemeral"},
+        }
+    ]
+    tone_clean = (tone_guide or "").strip()
+    if tone_clean:
+        system_blocks.append({
+            "type": "text",
+            "text": (
+                "[★ 사용자 톤 가이드 — 위 규칙과 충돌 시 톤 가이드를 우선]\n"
+                "아래 가이드는 모든 캠페인에 공통 적용되는 마케팅 팀 합의 사항입니다.\n"
+                "내용·사실은 위 작성 규칙을 따르되, 문장 톤·길이·표현 스타일은 아래를 따르세요.\n\n"
+                + tone_clean
+            ),
+        })
+
     response = _client().messages.create(
         model=settings.anthropic_text_model,
         max_tokens=2048,
@@ -223,13 +245,7 @@ def generate_narrative(
             "effort": "medium",
             "format": {"type": "json_schema", "schema": NARRATIVE_SCHEMA},
         },
-        system=[
-            {
-                "type": "text",
-                "text": SYSTEM_PROMPT,
-                "cache_control": {"type": "ephemeral"},
-            }
-        ],
+        system=system_blocks,
         messages=[
             {
                 "role": "user",
