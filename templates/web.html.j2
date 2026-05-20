@@ -62,10 +62,13 @@
       </div>
       {% endif %}
 
+      {# bullet 규칙: 1개=paragraph, 2개+=bullets, string=옛 빌드 호환 #}
       {% macro sec(num, title, items) %}
         <h2 class="sec"><span class="num">{{ num }}.</span>{{ title }}</h2>
         {% if items is string %}
           {% if items %}<p>{{ items }}</p>{% endif %}
+        {% elif items and items|length == 1 %}
+          <p>{{ items[0] }}</p>
         {% elif items %}
           <ul class="bul">
             {% for it in items %}<li>{{ it }}</li>{% endfor %}
@@ -81,11 +84,13 @@
         {% if narrative.strategy %}<p>{{ narrative.strategy }}</p>{% endif %}
       {% elif narrative.strategy %}
         {% set strat = narrative.strategy %}
-        {% if strat|length > 0 %}<p>{{ strat[0] }}</p>{% endif %}
-        {% if strat|length > 1 %}
-        <ul class="bul">
-          {% for it in strat[1:] %}<li>{{ it }}</li>{% endfor %}
-        </ul>
+        <p>{{ strat[0] }}</p>
+        {% if strat|length == 2 %}
+          <p>{{ strat[1] }}</p>
+        {% elif strat|length > 2 %}
+          <ul class="bul">
+            {% for it in strat[1:] %}<li>{{ it }}</li>{% endfor %}
+          </ul>
         {% endif %}
       {% endif %}
 
@@ -101,7 +106,7 @@
             <tr><th style="width:38%">성과 지표</th><th style="width:24%">수치</th><th>비고</th></tr>
           </thead>
           <tbody>
-            {% for m in campaign.metrics_table[:4] %}
+            {% for m in campaign.metrics_table[:6] %}
             <tr>
               <td class="ind">{{ m.indicator }}</td>
               <td class="val{% if loop.last %} warm{% endif %}">{{ m.value }}</td>
@@ -116,11 +121,15 @@
       {% if narrative.insights %}
       <div class="insights">
         <h2>05. 인사이트 <small>Motiv's Value</small></h2>
-        <ul>
-          {% for item in narrative.insights %}
-          <li>{{ item }}</li>
-          {% endfor %}
-        </ul>
+        {% if narrative.insights|length == 1 %}
+          <p>{{ narrative.insights[0] }}</p>
+        {% else %}
+          <ul>
+            {% for item in narrative.insights %}
+            <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
       </div>
       {% endif %}
 

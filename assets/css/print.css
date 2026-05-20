@@ -290,6 +290,12 @@ table.metrics .note {
   padding: 0;
   margin: 0;
 }
+.insights > p {
+  margin: 0;
+  font-size: 8.4pt;
+  line-height: 1.5;
+  color: #1f2419;
+}
 .insights li {
   position: relative;
   padding: 0 0 1.2mm 3.5mm;
