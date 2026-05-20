@@ -57,10 +57,16 @@
       </div>
       {% endif %}
 
+      {# 불릿 규칙 (전 섹션 공통):
+         - 항목 1개 = 단일 서술 → <p> 단락
+         - 항목 2개 이상 = 동일 층위 메시지 묶음 → <ul class="bul">
+         - 문자열 = 옛 빌드 호환 → 단락 #}
       {% macro sec(num, title, items) %}
         <h2 class="sec"><span class="num">{{ num }}.</span>{{ title }}</h2>
         {% if items is string %}
           {% if items %}<p>{{ items }}</p>{% endif %}
+        {% elif items and items|length == 1 %}
+          <p>{{ items[0] }}</p>
         {% elif items %}
           <ul class="bul">
             {% for it in items %}<li>{{ it }}</li>{% endfor %}
@@ -71,18 +77,20 @@
       {{ sec('01', '캠페인 목적',    narrative.overview)   }}
       {{ sec('02', '광고 집행 배경', narrative.background) }}
 
-      {# 03 적용 전략: list 면 첫 항목 = lead paragraph, 나머지 = bullets.
-         str 이면 단락 그대로. 모델 출력 변환 흡수 #}
+      {# 03 적용 전략: 첫 항목은 항상 lead 단락. 나머지가 1개면 paragraph, 2개 이상이면 bullets.
+         (bullet 은 동일 층위 메시지가 여러 개일 때만 — 1개일 땐 단락으로) #}
       <h2 class="sec"><span class="num">03.</span>적용 전략</h2>
       {% if narrative.strategy is string %}
         {% if narrative.strategy %}<p>{{ narrative.strategy }}</p>{% endif %}
       {% elif narrative.strategy %}
         {% set strat = narrative.strategy %}
-        {% if strat|length > 0 %}<p>{{ strat[0] }}</p>{% endif %}
-        {% if strat|length > 1 %}
-        <ul class="bul">
-          {% for it in strat[1:] %}<li>{{ it }}</li>{% endfor %}
-        </ul>
+        <p>{{ strat[0] }}</p>
+        {% if strat|length == 2 %}
+          <p>{{ strat[1] }}</p>
+        {% elif strat|length > 2 %}
+          <ul class="bul">
+            {% for it in strat[1:] %}<li>{{ it }}</li>{% endfor %}
+          </ul>
         {% endif %}
       {% endif %}
 
@@ -99,8 +107,8 @@
             <tr><th style="width:38%">성과 지표</th><th style="width:24%">수치</th><th>비고</th></tr>
           </thead>
           <tbody>
-            {# 4 row cap — 사용자가 표 선택을 더 보낸 경우에도 1page 안에 들어가도록 #}
-            {% for m in campaign.metrics_table[:4] %}
+            {# 6 row cap — 7 이상이면 1page 넘침 위험. 더 많이 보이려면 편집 모드에서 _table off 로 줄여주세요. #}
+            {% for m in campaign.metrics_table[:6] %}
             <tr>
               <td class="ind">{{ m.indicator }}</td>
               <td class="val{% if loop.last %} warm{% endif %}">{{ m.value }}</td>
@@ -115,11 +123,15 @@
       {% if narrative.insights %}
       <div class="insights">
         <h2>05. 인사이트 <small>Motiv's Value</small></h2>
-        <ul>
-          {% for item in narrative.insights %}
-          <li>{{ item }}</li>
-          {% endfor %}
-        </ul>
+        {% if narrative.insights|length == 1 %}
+          <p>{{ narrative.insights[0] }}</p>
+        {% else %}
+          <ul>
+            {% for item in narrative.insights %}
+            <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
       </div>
       {% endif %}
 

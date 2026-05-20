@@ -262,6 +262,7 @@ table.metrics .note { color: var(--muted); font-size: 12px; word-break: keep-all
   border-radius: 3px;
 }
 .insights ul { list-style: none; padding: 0; margin: 0; }
+.insights > p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--ink); }
 .insights li {
   position: relative;
   padding: 0 0 6px 16px;
