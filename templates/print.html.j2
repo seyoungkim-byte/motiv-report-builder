@@ -61,19 +61,23 @@
          - 기본: 한 항목 = <p> 단락
          - '- ' / '* ' / '▪ ' / '• ' 로 시작한 줄 = 불릿
          - 연속된 불릿은 한 <ul> 로 자동 그룹화
-         html_renderer._to_blocks 가 미리 그룹화해서 {kind, ...} 로 넘김 #}
+         html_renderer._to_blocks 가 미리 그룹화해서 {kind, ...} 로 넘김.
+         Defensive: 비정상 경로 (옛 빌드) 에서 b 가 dict 아닐 수도 있어
+         is mapping 검사 후 fallback. #}
       {% macro sec(num, title, blocks) %}
         <h2 class="sec"><span class="num">{{ num }}.</span>{{ title }}</h2>
         {% if blocks is string %}
           {% if blocks %}<p>{{ blocks }}</p>{% endif %}
         {% elif blocks %}
           {% for b in blocks %}
-            {% if b.kind == 'ul' %}
+            {% if b is mapping and b.get('kind') == 'ul' %}
               <ul class="bul">
-                {% for it in b['items'] %}<li>{{ it }}</li>{% endfor %}
+                {% for it in b.get('items', []) %}<li>{{ it }}</li>{% endfor %}
               </ul>
+            {% elif b is mapping %}
+              <p>{{ b.get('text', '') }}</p>
             {% else %}
-              <p>{{ b.text }}</p>
+              <p>{{ b }}</p>
             {% endif %}
           {% endfor %}
         {% endif %}
@@ -86,12 +90,14 @@
         {% if narrative.strategy %}<p>{{ narrative.strategy }}</p>{% endif %}
       {% elif narrative.strategy %}
         {% for b in narrative.strategy %}
-          {% if b.kind == 'ul' %}
+          {% if b is mapping and b.get('kind') == 'ul' %}
             <ul class="bul">
-              {% for it in b['items'] %}<li>{{ it }}</li>{% endfor %}
+              {% for it in b.get('items', []) %}<li>{{ it }}</li>{% endfor %}
             </ul>
+          {% elif b is mapping %}
+            <p>{{ b.get('text', '') }}</p>
           {% else %}
-            <p>{{ b.text }}</p>
+            <p>{{ b }}</p>
           {% endif %}
         {% endfor %}
       {% endif %}

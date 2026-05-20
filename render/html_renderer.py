@@ -71,9 +71,19 @@ def _to_blocks(items: Any) -> list[dict[str, Any]]:
       - '- ' / '* ' / '▪ ' / '• ' 로 시작 = 불릿 항목
       - 그 외 = paragraph 항목
     연속된 불릿 항목은 하나의 <ul> 로 묶이고, 그 사이 일반 항목은 <p> 로.
+
+    Defensive: list 가 아니어도 iterable 이면 받아서 처리. 항목이 이미 dict
+    형태(kind/items/text) 면 그대로 통과시킴 — 옛 빌드 load 같은 비정상 경로
+    에서도 jinja UndefinedError 가 안 나도록.
     """
-    if not isinstance(items, list):
+    # str / 단일 값은 list 가 아니라 빈 결과 — 호출측에서 paragraph 분기 처리.
+    if isinstance(items, str) or items is None:
         return []
+    try:
+        iter(items)
+    except TypeError:
+        return []
+
     blocks: list[dict[str, Any]] = []
     cur_ul: list[Any] = []
 
@@ -84,8 +94,13 @@ def _to_blocks(items: Any) -> list[dict[str, Any]]:
             cur_ul = []
 
     for raw in items:
+        # 이미 block dict 형태로 들어오면 그대로 통과 (kind 보장).
+        if isinstance(raw, dict) and raw.get("kind") in ("p", "ul"):
+            _flush_ul()
+            blocks.append(raw)
+            continue
+        # 그 외엔 str 로 강제 후 마커 검사.
         if not isinstance(raw, str):
-            # 이미 변환된 Markup 일 수도. str 로 강제 후 검사.
             try:
                 raw_s = str(raw)
             except Exception:
@@ -112,16 +127,31 @@ def _enrich_narrative(nar: dict[str, Any]) -> dict[str, Any]:
     """narrative dict 의 모든 string 값을 _md_to_safe_html 로 변환.
     overview/background/strategy 는 추가로 _to_blocks 로 그룹화 — 템플릿이
     {kind: 'p'|'ul', ...} 블록 단위로 렌더. insights 는 항상 list[str] 유지
-    (별도 박스 안에서 단순 ul 또는 p 처리)."""
+    (별도 박스 안에서 단순 ul 또는 p 처리).
+
+    Defensive: list 가 아닌 입력(str, None, tuple 등)도 안전 처리.
+    block field 값은 변환 후 항상 list[dict({kind})] 또는 Markup 보장.
+    """
     out: dict[str, Any] = {}
     for k, v in (nar or {}).items():
-        if k in _BLOCK_FIELDS and isinstance(v, list):
-            out[k] = _to_blocks(v)
-            # 원본 list 도 같은 키 _items 로 노출 — docx/txt renderer 용
-            out[f"{k}_items"] = [
-                _md_to_safe_html(_strip_bullet_prefix(x)) if isinstance(x, str) else x
-                for x in v
-            ]
+        if k in _BLOCK_FIELDS:
+            # 옛 빌드: str — paragraph 분기를 위해 그대로 변환된 Markup 유지
+            if isinstance(v, str):
+                out[k] = _md_to_safe_html(v)
+                out[f"{k}_items"] = [_md_to_safe_html(v)]
+            elif v is None:
+                out[k] = []
+                out[f"{k}_items"] = []
+            else:
+                # list / tuple / 기타 iterable — _to_blocks 가 안전 처리
+                out[k] = _to_blocks(v)
+                try:
+                    out[f"{k}_items"] = [
+                        _md_to_safe_html(_strip_bullet_prefix(x)) if isinstance(x, str) else x
+                        for x in v
+                    ]
+                except TypeError:
+                    out[f"{k}_items"] = []
             continue
         if isinstance(v, str):
             out[k] = _md_to_safe_html(v)
