@@ -19,6 +19,15 @@ from .supabase_client import get_client
 TABLE = "campaign_report_builds"
 
 
+# 가장 최근 save_build / load_build 실패의 raw error message 를 보관.
+# UI 측에서 사용자에게 노출용 — silent fail 디버깅 불가능 문제 해결.
+_LAST_ERROR: str | None = None
+
+
+def last_storage_error() -> str | None:
+    return _LAST_ERROR
+
+
 def _b64encode(data: bytes | None) -> str | None:
     if not data:
         return None
@@ -52,8 +61,10 @@ def save_build(
     txt: bytes,
 ) -> bool:
     """Upsert the latest build for a campaign. Returns True on success."""
+    global _LAST_ERROR
     client = get_client()
     if not client:
+        _LAST_ERROR = "Supabase 클라이언트 미초기화 (SUPABASE_URL / SUPABASE_KEY 확인)"
         return False
     try:
         client.table(TABLE).upsert({
@@ -72,8 +83,10 @@ def save_build(
             "docx_b64": _b64encode(docx),
             "txt_b64":  _b64encode(txt),
         }, on_conflict="campaign_no").execute()
+        _LAST_ERROR = None
         return True
-    except Exception:
+    except Exception as e:
+        _LAST_ERROR = f"{type(e).__name__}: {e}"
         return False
 
 
