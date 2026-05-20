@@ -178,6 +178,8 @@ body {
 .body__left .sec:first-child, .body__right .sec:first-child { margin-top: 0; }
 
 .body p { margin: 0 0 8px; font-size: 14px; line-height: 1.6; color: var(--ink); }
+.body p + p { margin-top: 6px; }
+.body p + ul.bul, .body ul.bul + p { margin-top: 6px; }
 .body p strong { color: var(--olive-dark); font-weight: 700; }
 ul.bul { list-style: none; padding: 0; margin: 0 0 12px; }
 ul.bul li {

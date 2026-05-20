@@ -8,26 +8,19 @@
 ■ 요약
 {{ narrative.summary }}
 
-{# 새 스키마: list[str] 이면 각 줄을 - 불릿으로, 옛 스키마: str 이면 그대로.
-   strategy 는 첫 항목 = lead-in 단락, 나머지 = 불릿. #}
+{# 불릿 규칙 (html/docx 와 동일):
+   - '- ' / '* ' 시작 = 불릿 (그대로 유지)
+   - 그 외 = paragraph (그대로 출력) #}
 {% macro section(title, val) %}
 ■ {{ title }}
 {% if val is string %}{{ val }}
-{% elif val %}{% for it in val %}- {{ it }}
-{% endfor %}{% endif %}
-{% endmacro %}
-
-{% macro strategy_section(title, val) %}
-■ {{ title }}
-{% if val is string %}{{ val }}
-{% elif val %}{% if val|length > 0 %}{{ val[0] }}
-{% endif %}{% for it in val[1:] %}- {{ it }}
+{% elif val %}{% for it in val %}{{ it }}
 {% endfor %}{% endif %}
 {% endmacro %}
 
 {{ section('01. 캠페인 목적', narrative.overview) }}
 {{ section('02. 광고 집행 배경', narrative.background) }}
-{{ strategy_section('03. 적용 전략', narrative.strategy) }}
+{{ section('03. 적용 전략', narrative.strategy) }}
 
 ■ 04. 캠페인 성과
 {% if campaign.metrics_table %}

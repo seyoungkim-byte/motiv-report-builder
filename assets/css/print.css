@@ -179,6 +179,10 @@ body {
   line-height: 1.55;
   color: #1f2419;
 }
+/* 연속 단락 사이 자연스러운 호흡 — 두 번째부터 위 간격 살짝 추가 */
+.body p + p { margin-top: 1.5mm; }
+/* 단락 → 불릿 또는 불릿 → 단락 전환부 간격 */
+.body p + ul.bul, .body ul.bul + p { margin-top: 1.5mm; }
 .body p strong {
   color: #3d4823;
   font-weight: 700;
