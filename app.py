@@ -540,32 +540,69 @@ with col_l:
         "  • 핵심 phrase 는 `**텍스트**` 로 감싸면 하이라이터 마커로 강조. 섹션당 1~2개 권장."
     )
 
+    def _parse_lines_with_spacers(text: str, cap: int | None = None) -> list[str]:
+        """textarea 입력을 list[str] 로 파싱.
+        - 줄 단위 항목, 빈 줄도 spacer 로 보존 (시각적 여백)
+        - 시작/끝 빈 줄은 제거, 연속 빈 줄은 1개로 collapse
+        - cap 지정 시 비-빈 항목 기준으로 cap"""
+        lines = [ln.strip() for ln in (text or "").splitlines()]
+        # 앞뒤 trim
+        while lines and not lines[0]:
+            lines.pop(0)
+        while lines and not lines[-1]:
+            lines.pop()
+        # 연속 빈 줄 collapse
+        out: list[str] = []
+        prev_empty = False
+        for ln in lines:
+            if ln:
+                out.append(ln)
+                prev_empty = False
+            elif not prev_empty:
+                out.append("")
+                prev_empty = True
+        if cap is not None:
+            # 비-빈 항목 기준 cap (spacer 는 count 에서 제외)
+            kept: list[str] = []
+            content_count = 0
+            for ln in out:
+                if ln:
+                    if content_count >= cap:
+                        break
+                    kept.append(ln)
+                    content_count += 1
+                else:
+                    kept.append(ln)
+            # 끝 trailing spacer 다시 정리
+            while kept and not kept[-1]:
+                kept.pop()
+            out = kept
+        return out
+
     for key, label in NARRATIVE_SECTIONS:
         if key in BULLET_SECTIONS:
             st.text_area(
-                f"{label} — 한 줄에 한 항목 (불릿 원하면 줄 앞에 '- ')",
+                f"{label} — 한 줄에 한 항목 (불릿 원하면 줄 앞에 '- ', 항목 사이 빈 줄 = 여백)",
                 height=110,
                 key=f"nar_{key}",
-                help="기본은 단락. '- ' 로 시작한 줄만 ▪ 불릿으로 렌더됩니다.",
+                help="기본은 단락. '- ' 로 시작한 줄만 ▪ 불릿. 빈 줄 = 시각적 여백.",
             )
-            st.session_state.narrative[key] = [
-                line.strip()
-                for line in st.session_state[f"nar_{key}"].splitlines()
-                if line.strip()
-            ][:5]
+            st.session_state.narrative[key] = _parse_lines_with_spacers(
+                st.session_state[f"nar_{key}"], cap=6
+            )
         else:
             st.text_area(label, height=120, key=f"nar_{key}")
             st.session_state.narrative[key] = st.session_state[f"nar_{key}"]
 
     st.text_area(
-        INSIGHTS_LABEL + " — 한 줄에 한 항목",
+        INSIGHTS_LABEL + " — 한 줄에 한 항목 (항목 사이 빈 줄 = 여백)",
         height=140,
         key="nar_insights",
-        help="빈 줄은 무시. 레퍼런스 기준 3항목 권장.",
+        help="레퍼런스 기준 3항목 권장. 항목 사이 빈 줄을 넣으면 PDF 에서도 한 줄 띄워집니다.",
     )
-    st.session_state.narrative[INSIGHTS_KEY] = [
-        line.strip() for line in st.session_state["nar_insights"].splitlines() if line.strip()
-    ]
+    st.session_state.narrative[INSIGHTS_KEY] = _parse_lines_with_spacers(
+        st.session_state["nar_insights"], cap=5
+    )
 
 with col_r:
     # ── 4. 성과 지표 — 표시 모드 / 편집 모드 토글 ──────────────

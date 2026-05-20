@@ -226,6 +226,15 @@ ul.bul li strong {
 }
 ul.bul li:last-child { padding-bottom: 0; }
 
+/* spacer blocks (textarea 의 빈 줄로부터) */
+.body .block-spacer { height: 10px; }
+.insights li.spacer {
+  padding: 0;
+  height: 8px;
+  list-style: none;
+}
+.insights li.spacer::before { content: ""; }
+
 /* ─── 04 table ──────────────────────────────────────── */
 .metrics-wrap { margin-bottom: 14px; }
 table.metrics { width: 100%; border-collapse: collapse; font-size: 13px; }
