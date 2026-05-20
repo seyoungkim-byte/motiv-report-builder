@@ -15,27 +15,39 @@ body {
 .page {
   width: 210mm;
   height: 297mm;
-  padding: 12mm 13mm 8mm;
+  padding: 0 0 8mm;             /* 좌우 padding 0 — hero 가 풀블리드 가능하게.
+                                   본문 요소들은 .body / .ftr 의 좌우 margin 으로 inset */
   display: flex;
   flex-direction: column;
   gap: 3.5mm;
   overflow: hidden;
 }
 
-/* ─── Hero ──────────────────────────────────────────── */
+/* ─── Hero: full-bleed cream panel + olive vertical strip + flush-right image ───
+   참고: 성잉영양식.pdf 톤. .page 의 padding 을 negative margin 으로 뚫고
+   페이지 좌우 가장자리까지 차게. 좌측 8mm 올리브 스트립 + cream 배경에 텍스트,
+   우측 grid cell 은 이미지가 가장자리까지 풀폭. */
 .hero {
   display: grid;
-  grid-template-columns: 1.6fr 1fr;       /* 텍스트 영역 살짝 더 넓게 */
-  gap: 7mm;
-  align-items: center;                    /* 이미지를 텍스트와 수직 중앙 정렬 */
-  padding-bottom: 2.5mm;
+  grid-template-columns: 1fr 1.05fr;
+  align-items: stretch;
+  border-left: 8mm solid #7fa84a;     /* olive vertical strip */
+  background: #f7f1e1;                /* warm cream — 성잉영양식 톤 */
+  height: 78mm;
+  overflow: hidden;
+}
+.hero__left {
+  padding: 11mm 9mm 9mm 10mm;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 .hero__eyebrow {
   font-size: 8.5pt;
-  font-weight: 800;
+  font-weight: 700;
   color: #3d4823;
   letter-spacing: .04em;
-  margin-bottom: 2.5mm;
+  margin-bottom: 3mm;
 }
 .hero__eyebrow span {
   color: #7fa84a;
@@ -48,10 +60,14 @@ body {
 .hero__title {
   margin: 0;
   font-size: 21pt;
-  line-height: 1.18;
+  line-height: 1.22;
   font-weight: 800;
   color: #1f2419;
   letter-spacing: -0.01em;
+  /* 자동 줄바꿈: 한국어 단어 단위 유지 + 모던 브라우저 balance */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  text-wrap: balance;
 }
 .hero__title em {
   color: #7fa84a;
@@ -64,12 +80,14 @@ body {
   color: #3d4823;
   font-weight: 600;
   line-height: 1.45;
+  word-break: keep-all;
+  text-wrap: balance;
 }
 .hero__rule {
-  width: 24mm;
+  width: 22mm;
   border: 0;
-  border-top: 0.5mm solid #2d3818;
-  margin: 3.5mm 0 2.5mm;
+  border-top: 0.45mm solid #2d3818;
+  margin: 4mm 0 3mm;
 }
 .hero__meta {
   display: flex;
@@ -97,20 +115,15 @@ body {
   word-break: keep-all;
 }
 
+/* 우측 이미지 셀 — grid cell 전체 풀폭, 가장자리까지 */
 .hero__img {
   width: 100%;
-  max-width: 58mm;                                /* 너무 커지지 않게 cap */
-  aspect-ratio: 4 / 5;                            /* portrait, 살짝 세로 */
-  margin-left: auto;                              /* hero grid 셀 내 우측 정렬 */
-  border-radius: 3mm;                             /* 둥근 모서리 */
+  height: 100%;
   background-color: #2d2218;
   background-size: cover;
   background-position: center;
   position: relative;
   overflow: hidden;
-  box-shadow:
-    0 1.2mm 3mm rgba(40, 30, 20, 0.18),           /* 메인 그림자 */
-    0 0.3mm 1mm rgba(40, 30, 20, 0.10);           /* 가까이 살짝 더 */
 }
 .hero__img--placeholder {
   background:
@@ -135,6 +148,7 @@ body {
   gap: 5mm;
   align-items: start;
   flex: 1;
+  margin: 0 13mm;                /* page 좌우 inset (hero 풀블리드와 분리) */
 }
 
 /* ─── Summary callout ───────────────────────────────── */
@@ -341,7 +355,7 @@ table.metrics .note {
 
 /* ─── Footer ────────────────────────────────────────── */
 .ftr {
-  margin-top: auto;
+  margin: auto 13mm 0;
   padding-top: 2mm;
   border-top: 0.4mm solid #2d3818;
   display: flex;

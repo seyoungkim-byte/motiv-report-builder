@@ -758,6 +758,12 @@ with col_r:
                 except Exception as e:
                     st.error(f"생성 실패: {e}")
     with tab_upload:
+        st.caption(
+            "🖼️ **권장 사이즈** — 가로:세로 = **5:4 (가로형)**, "
+            "**최소 1400 × 1120 px** (인쇄 품질 위해 더 큰 것도 OK). "
+            "PDF 헤더 우측 절반을 풀폭으로 차지하므로 **여백 없는 풀블리드 사진** 을 권장합니다. "
+            "센터 영역에 핵심 피사체가 오면 잘림 위험 적음."
+        )
         uploaded = st.file_uploader(
             "PNG/JPG 파일", type=["png", "jpg", "jpeg"], key="hero_upload"
         )
