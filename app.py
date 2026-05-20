@@ -155,6 +155,8 @@ def _reset_campaign_state(data: CampaignData):
     _df["_select"] = False
     # 기본 04 표 = 전체 노출 (사용자가 빼고 싶으면 체크 해제)
     _df["_table"]  = True
+    # 강조 (coral) — 디폴트: 마지막 row 만 True. 사용자가 체크박스로 재선택 가능.
+    _df["_highlight"] = [i == len(_df) - 1 for i in range(len(_df))]
     st.session_state.metrics_df = _df
     st.session_state.narrative = (
         {k: "" for k, _ in NARRATIVE_SECTIONS} | {INSIGHTS_KEY: [], TLDR_KEY: []}
@@ -209,7 +211,7 @@ def _reset_campaign_state(data: CampaignData):
         st.session_state["nar_tldr"] = "\n".join(nar.get(TLDR_KEY, []))
 
     # metrics_table 도 saved build 에서 복원 — 사용자가 수기로 편집한 indicator/
-    # value/note 와 _table 체크 상태를 보존.
+    # value/note 와 _table / _highlight 체크 상태를 보존.
     saved_metrics = src.get("metrics_table") or []
     if saved_metrics:
         saved_df = pd.DataFrame(saved_metrics)
@@ -220,6 +222,13 @@ def _reset_campaign_state(data: CampaignData):
             saved_df["_select"] = False
         if "_table" not in saved_df.columns:
             saved_df["_table"] = True
+        # highlight 컬럼은 옛 빌드(saved) → MetricRow.highlight 또는 _highlight 어느
+        # 쪽이든 흡수. 둘 다 없으면 마지막 행 default.
+        if "_highlight" not in saved_df.columns and "highlight" in saved_df.columns:
+            saved_df["_highlight"] = saved_df["highlight"].fillna(False).astype(bool)
+            saved_df = saved_df.drop(columns=["highlight"])
+        if "_highlight" not in saved_df.columns:
+            saved_df["_highlight"] = [i == len(saved_df) - 1 for i in range(len(saved_df))]
         st.session_state.metrics_df = saved_df
 
     # Header 메타 복원 (옛 빌드는 header_meta 없을 수 있음 — setdefault 처리)
@@ -631,7 +640,7 @@ with col_r:
     # 컬럼 보장 (표시·편집 양쪽에서 사용)
     if st.session_state.metrics_df is None:
         st.session_state.metrics_df = pd.DataFrame(
-            columns=["indicator", "value", "note", "_select", "_table"]
+            columns=["indicator", "value", "note", "_select", "_table", "_highlight"]
         )
     else:
         df_cur = st.session_state.metrics_df
@@ -639,20 +648,23 @@ with col_r:
             df_cur["_select"] = False
         if "_table" not in df_cur.columns:
             df_cur["_table"] = True
+        if "_highlight" not in df_cur.columns:
+            df_cur["_highlight"] = [i == len(df_cur) - 1 for i in range(len(df_cur))]
 
     if st.session_state.metrics_df is None or len(st.session_state.metrics_df) == 0:
         st.info("좌측에서 캠페인을 로드하면 카탈로그 기반 성과 지표가 자동으로 채워집니다.")
     elif not _in_edit:
         # ── 표시 모드 (read-only) ──
         _display_df = st.session_state.metrics_df
-        _cols = [c for c in ["_table", "indicator", "value", "note"] if c in _display_df.columns]
+        _cols = [c for c in ["_table", "_highlight", "indicator", "value", "note"] if c in _display_df.columns]
         st.dataframe(
             _display_df[_cols],
             column_config={
-                "_table": st.column_config.CheckboxColumn("표",  disabled=True, width="small"),
-                "indicator": st.column_config.TextColumn("성과 지표"),
-                "value":     st.column_config.TextColumn("성과"),
-                "note":      st.column_config.TextColumn("비고"),
+                "_table":     st.column_config.CheckboxColumn("표",   disabled=True, width="small"),
+                "_highlight": st.column_config.CheckboxColumn("강조", disabled=True, width="small"),
+                "indicator":  st.column_config.TextColumn("성과 지표"),
+                "value":      st.column_config.TextColumn("성과"),
+                "note":       st.column_config.TextColumn("비고"),
             },
             width="stretch",
             hide_index=True,
@@ -664,15 +676,17 @@ with col_r:
             num_rows="dynamic",
             width="stretch",
             column_config={
-                "_select":   st.column_config.CheckboxColumn("↕",  width="small",
-                                help="체크 후 아래 ▲▼ 로 행 이동"),
-                "_table":    st.column_config.CheckboxColumn("표",  width="small",
-                                help="04 캠페인 성과 표 노출. 체크된 행 순서대로."),
-                "indicator": st.column_config.TextColumn("성과 지표"),
-                "value":     st.column_config.TextColumn("성과"),
-                "note":      st.column_config.TextColumn("비고"),
+                "_select":    st.column_config.CheckboxColumn("↕",  width="small",
+                                 help="체크 후 아래 ▲▼ 로 행 이동"),
+                "_table":     st.column_config.CheckboxColumn("표",  width="small",
+                                 help="04 캠페인 성과 표 노출. 체크된 행 순서대로."),
+                "_highlight": st.column_config.CheckboxColumn("강조", width="small",
+                                 help="이 행의 수치를 coral 색으로 강조. 여러 개 가능."),
+                "indicator":  st.column_config.TextColumn("성과 지표"),
+                "value":      st.column_config.TextColumn("성과"),
+                "note":       st.column_config.TextColumn("비고"),
             },
-            column_order=["_select", "_table", "indicator", "value", "note"],
+            column_order=["_select", "_table", "_highlight", "indicator", "value", "note"],
             key="metrics_editor",
         )
 
@@ -736,6 +750,7 @@ with col_r:
             )
             fresh_df["_select"] = False
             fresh_df["_table"]  = True
+            fresh_df["_highlight"] = [i == len(fresh_df) - 1 for i in range(len(fresh_df))]
             st.session_state.metrics_df = fresh_df
             if "metrics_editor" in st.session_state:
                 del st.session_state["metrics_editor"]
@@ -976,6 +991,7 @@ with col_r:
                 indicator=str(r.get("indicator", "")).strip(),
                 value=str(r.get("value", "")).strip(),
                 note=str(r.get("note", "")).strip(),
+                highlight=bool(r.get("_highlight", False)),
             )
         # 04 표 = '표' 체크박스가 켜진 행만 (옛 빌드 호환: 컬럼 없으면 모두 포함)
         table_records = [r for r in valid_records if r.get("_table", True)]

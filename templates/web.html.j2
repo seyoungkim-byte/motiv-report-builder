@@ -118,10 +118,11 @@
             <tr><th style="width:38%">성과 지표</th><th style="width:24%">수치</th><th>비고</th></tr>
           </thead>
           <tbody>
+            {% set _any_h = (campaign.metrics_table | selectattr('highlight') | list | length) > 0 %}
             {% for m in campaign.metrics_table[:8] %}
             <tr>
               <td class="ind">{{ m.indicator }}</td>
-              <td class="val{% if loop.last %} warm{% endif %}">{{ m.value }}</td>
+              <td class="val{% if m.highlight or (not _any_h and loop.last) %} warm{% endif %}">{{ m.value }}</td>
               <td class="note">{{ m.note }}</td>
             </tr>
             {% endfor %}

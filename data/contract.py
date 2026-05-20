@@ -20,6 +20,7 @@ class MetricRow:
     indicator: str     # e.g. "크로스디바이스 도달률"
     value: str         # e.g. "2.2%", "53% 절감", "노출 3.1배 / 도달 1.9배"
     note: str = ""     # e.g. "TV·Mobile 모두 광고 시청"
+    highlight: bool = False  # 표 안에서 이 row 의 수치를 coral 강조 (편집모드 '강조' 체크박스)
 
 
 @dataclass
