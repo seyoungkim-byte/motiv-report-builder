@@ -119,11 +119,13 @@
             <tr><th style="width:38%">성과 지표</th><th style="width:24%">수치</th><th>비고</th></tr>
           </thead>
           <tbody>
-            {# 8 row cap — 그 이상이면 1page 넘침 위험. 편집 모드의 '표' 체크박스 OFF 로 조절. #}
+            {# 8 row cap — 그 이상이면 1page 넘침 위험. 편집 모드의 '표' 체크박스 OFF 로 조절.
+               '강조' (m.highlight) 가 켜진 행만 coral. 명시 강조가 0개면 마지막 행 자동 fallback. #}
+            {% set _any_h = (campaign.metrics_table | selectattr('highlight') | list | length) > 0 %}
             {% for m in campaign.metrics_table[:8] %}
             <tr>
               <td class="ind">{{ m.indicator }}</td>
-              <td class="val{% if loop.last %} warm{% endif %}">{{ m.value }}</td>
+              <td class="val{% if m.highlight or (not _any_h and loop.last) %} warm{% endif %}">{{ m.value }}</td>
               <td class="note">{{ m.note }}</td>
             </tr>
             {% endfor %}
