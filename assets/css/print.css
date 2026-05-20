@@ -9,7 +9,7 @@ body {
   font: 9.5pt/1.55 "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo",
                    "Noto Sans CJK KR", "Noto Sans KR", "Noto Sans",
                    sans-serif;
-  color: #1f2419;
+  color: #0a1126;
   background: #ffffff;
 }
 .page {
@@ -31,8 +31,8 @@ body {
   display: grid;
   grid-template-columns: 1fr 1.05fr;
   align-items: stretch;
-  border-left: 8mm solid #7fa84a;     /* olive vertical strip */
-  background: #f7f1e1;                /* warm cream — 성잉영양식 톤 */
+  border-left: 8mm solid #1E5EFF;     /* olive vertical strip */
+  background: #F4F7FF;                /* warm cream — 성잉영양식 톤 */
   height: 78mm;
   overflow: hidden;
 }
@@ -45,12 +45,12 @@ body {
 .hero__eyebrow {
   font-size: 8.5pt;
   font-weight: 700;
-  color: #3d4823;
+  color: #0040C9;
   letter-spacing: .04em;
   margin-bottom: 3mm;
 }
 .hero__eyebrow span {
-  color: #7fa84a;
+  color: #1E5EFF;
   font-weight: 800;
   letter-spacing: .12em;
   margin-left: 5px;
@@ -62,7 +62,7 @@ body {
   font-size: 21pt;
   line-height: 1.22;
   font-weight: 800;
-  color: #1f2419;
+  color: #0a1126;
   letter-spacing: -0.01em;
   /* 자동 줄바꿈: 한국어 단어 단위 유지 + 모던 브라우저 balance */
   word-break: keep-all;
@@ -70,14 +70,14 @@ body {
   text-wrap: balance;
 }
 .hero__title em {
-  color: #7fa84a;
+  color: #1E5EFF;
   font-style: normal;
 }
 .hero__title em.warm { color: #d76e3e; }
 .hero__sub {
   margin: 2mm 0 0;
   font-size: 9.5pt;
-  color: #3d4823;
+  color: #0040C9;
   font-weight: 600;
   line-height: 1.45;
   word-break: keep-all;
@@ -86,7 +86,7 @@ body {
 .hero__rule {
   width: 22mm;
   border: 0;
-  border-top: 0.45mm solid #2d3818;
+  border-top: 0.45mm solid #0a1f7a;
   margin: 4mm 0 3mm;
 }
 .hero__meta {
@@ -106,12 +106,12 @@ body {
 .hero__meta__label {
   font-size: 7.5pt;
   font-weight: 700;
-  color: #7fa84a;
+  color: #1E5EFF;
 }
 .hero__meta__value {
   font-size: 8.5pt;
   font-weight: 700;
-  color: #3d4823;
+  color: #0040C9;
   word-break: keep-all;
 }
 
@@ -119,7 +119,7 @@ body {
 .hero__img {
   width: 100%;
   height: 100%;
-  background-color: #2d2218;
+  background-color: #0a1f7a;
   background-size: cover;
   background-position: center;
   position: relative;
@@ -128,7 +128,7 @@ body {
 .hero__img--placeholder {
   background:
     radial-gradient(circle at 30% 30%, rgba(255,255,255,.22) 0%, transparent 45%),
-    linear-gradient(135deg, #4d3320 0%, #8b6b4c 50%, #c9a961 100%);
+    linear-gradient(135deg, #0a1f7a 0%, #1E5EFF 50%, #6B9DFF 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -153,8 +153,8 @@ body {
 
 /* ─── Summary callout ───────────────────────────────── */
 .summary {
-  background: #eef2dd;
-  border-left: 0.8mm solid #7fa84a;
+  background: #E8EFFF;
+  border-left: 0.8mm solid #1E5EFF;
   padding: 2.5mm 3mm;
   border-radius: 0 1mm 1mm 0;
   margin: 0 0 2.5mm;
@@ -162,14 +162,14 @@ body {
 .summary h3 {
   margin: 0 0 1mm;
   font-size: 9.5pt;
-  color: #3d4823;
+  color: #0040C9;
   font-weight: 800;
 }
-.summary p { margin: 0; font-size: 8.6pt; line-height: 1.5; color: #1f2419; }
+.summary p { margin: 0; font-size: 8.6pt; line-height: 1.5; color: #0a1126; }
 .summary p strong {
-  color: #3d4823;
+  color: #0040C9;
   font-weight: 800;
-  background: linear-gradient(transparent 60%, rgba(127,168,74,0.22) 60%);
+  background: linear-gradient(transparent 60%, rgba(30,94,255,0.22) 60%);
   padding: 0 1px;
 }
 
@@ -177,10 +177,10 @@ body {
 .sec {
   margin: 6mm 0 2mm;                  /* was 2.8mm — 챕터 간 호흡 더 */
   padding-top: 2mm;                   /* 위 가는 hairline 자리 */
-  border-top: 0.2mm solid #e6e2d4;    /* subtle 구분선 */
+  border-top: 0.2mm solid #E1E5EE;    /* subtle 구분선 */
   font-size: 10.5pt;
   font-weight: 800;
-  color: #1f2419;
+  color: #0a1126;
   display: flex;
   align-items: baseline;
   gap: 1.5mm;
@@ -194,7 +194,7 @@ body {
   margin-top: 0;
 }
 .sec .num {
-  color: #7fa84a;
+  color: #1E5EFF;
   font-weight: 800;
   font-size: 9.5pt;
 }
@@ -206,14 +206,14 @@ body {
   margin: 0 0 1.8mm;
   font-size: 8.8pt;
   line-height: 1.55;
-  color: #1f2419;
+  color: #0a1126;
 }
 /* 연속 단락 사이 자연스러운 호흡 — 두 번째부터 위 간격 살짝 추가 */
 .body p + p { margin-top: 1.5mm; }
 /* 단락 → 불릿 또는 불릿 → 단락 전환부 간격 */
 .body p + ul.bul, .body ul.bul + p { margin-top: 1.5mm; }
 .body p strong {
-  color: #3d4823;
+  color: #0040C9;
   font-weight: 700;
 }
 ul.bul {
@@ -226,20 +226,20 @@ ul.bul li {
   padding: 0 0 1.2mm 4mm;
   font-size: 8.7pt;
   line-height: 1.5;
-  color: #1f2419;
+  color: #0a1126;
 }
 ul.bul li::before {
   content: "▪";
   position: absolute;
   left: 1mm;
   top: -0.2mm;
-  color: #7fa84a;
+  color: #1E5EFF;
   font-size: 9pt;
 }
 ul.bul li strong {
-  color: #3d4823;
+  color: #0040C9;
   font-weight: 700;
-  background: linear-gradient(transparent 60%, rgba(127,168,74,0.22) 60%);
+  background: linear-gradient(transparent 60%, rgba(30,94,255,0.22) 60%);
   padding: 0 1px;
 }
 ul.bul li:last-child { padding-bottom: 0; }
@@ -261,7 +261,7 @@ table.metrics {
   font-size: 8.4pt;
 }
 table.metrics thead th {
-  background: #2d3818;
+  background: #0a1f7a;
   color: #ffffff;
   padding: 1.6mm 2mm;
   text-align: left;
@@ -272,20 +272,20 @@ table.metrics thead th {
 }
 table.metrics tbody td {
   padding: 1.8mm 2mm;
-  border-bottom: 0.2mm solid #e6e2d4;
+  border-bottom: 0.2mm solid #E1E5EE;
   vertical-align: middle;
   line-height: 1.4;
   background: #ffffff;
 }
-table.metrics tbody tr:nth-child(even) td { background: #fcfaf2; }
+table.metrics tbody tr:nth-child(even) td { background: #F8FAFF; }
 table.metrics .ind {
   font-weight: 600;
   word-break: keep-all;
-  color: #1f2419;
+  color: #0a1126;
   font-size: 8.2pt;
 }
 table.metrics .val {
-  color: #3d4823;
+  color: #0040C9;
   font-weight: 800;
   white-space: nowrap;
   font-size: 10pt;
@@ -293,7 +293,7 @@ table.metrics .val {
 }
 table.metrics .val.warm { color: #d76e3e; }
 table.metrics .note {
-  color: #6e6a5e;
+  color: #6b7280;
   font-size: 7.6pt;
   word-break: keep-all;
   line-height: 1.4;
@@ -312,7 +312,7 @@ table.metrics .note {
   margin: 0 0 1.5mm;
   font-size: 10pt;
   font-weight: 800;
-  color: #3d4823;
+  color: #0040C9;
   display: flex;
   align-items: center;
   gap: 2mm;
@@ -336,27 +336,27 @@ table.metrics .note {
   margin: 0;
   font-size: 8.4pt;
   line-height: 1.5;
-  color: #1f2419;
+  color: #0a1126;
 }
 .insights li {
   position: relative;
   padding: 0 0 1.2mm 3.5mm;
   font-size: 8.4pt;
   line-height: 1.5;
-  color: #1f2419;
+  color: #0a1126;
 }
 .insights li::before {
   content: "○";
   position: absolute;
   left: 0.5mm;
   top: 0.2mm;
-  color: #7fa84a;
+  color: #1E5EFF;
   font-size: 7.5pt;
   font-weight: 800;
 }
 .insights li:last-child { padding-bottom: 0; }
 .insights li strong {
-  color: #3d4823;
+  color: #0040C9;
   font-weight: 800;
   background: linear-gradient(transparent 60%, rgba(232,162,58,0.32) 60%);
   padding: 0 1px;
@@ -366,16 +366,16 @@ table.metrics .note {
 .ftr {
   margin: auto 13mm 0;
   padding-top: 2mm;
-  border-top: 0.4mm solid #2d3818;
+  border-top: 0.4mm solid #0a1f7a;
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
   gap: 3mm;
   font-size: 6.8pt;
-  color: #6e6a5e;
+  color: #6b7280;
 }
 .ftr__about strong {
-  color: #3d4823;
+  color: #0040C9;
   font-weight: 800;
   font-size: 7.5pt;
   display: block;
@@ -388,7 +388,7 @@ table.metrics .note {
   font-size: 6.8pt;
 }
 .ftr__meta { text-align: right; line-height: 1.5; }
-.ftr__meta a { color: #3d4823; text-decoration: none; }
+.ftr__meta a { color: #0040C9; text-decoration: none; }
 
 /* ─── Legacy figures / charts — kept for backwards-compat
        if a campaign still has chart_set, render below in flow. */
@@ -403,7 +403,7 @@ table.metrics .note {
 .fig {
   margin: 0;
   background: #ffffff;
-  border: 0.3mm solid #e6e2d4;
+  border: 0.3mm solid #E1E5EE;
   border-radius: 1mm;
   padding: 1.5mm 2mm;
   page-break-inside: avoid;
@@ -417,12 +417,12 @@ table.metrics .note {
   border-bottom: 0.2mm solid #f0ece0;
 }
 .fig__num { font-size: 7pt; font-weight: 800; color: #e8a23a; letter-spacing: .02em; }
-.fig__title { font-size: 8.5pt; font-weight: 700; color: #1f2419; }
+.fig__title { font-size: 8.5pt; font-weight: 700; color: #0a1126; }
 .fig img { display: block; width: 100%; height: auto; max-height: 32mm; object-fit: contain; }
 .fig figcaption {
   margin-top: 0.8mm;
   font-size: 7.2pt;
-  color: #3d4823;
+  color: #0040C9;
   font-weight: 500;
   line-height: 1.35;
   padding-left: 1.5mm;
