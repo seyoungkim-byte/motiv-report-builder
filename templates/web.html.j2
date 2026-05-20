@@ -74,6 +74,8 @@
               <ul class="bul">
                 {% for it in b.get('items', []) %}<li>{{ it }}</li>{% endfor %}
               </ul>
+            {% elif b is mapping and b.get('kind') == 'spacer' %}
+              <div class="block-spacer"></div>
             {% elif b is mapping %}
               <p>{{ b.get('text', '') }}</p>
             {% else %}
@@ -94,6 +96,8 @@
             <ul class="bul">
               {% for it in b.get('items', []) %}<li>{{ it }}</li>{% endfor %}
             </ul>
+          {% elif b is mapping and b.get('kind') == 'spacer' %}
+            <div class="block-spacer"></div>
           {% elif b is mapping %}
             <p>{{ b.get('text', '') }}</p>
           {% else %}
@@ -127,18 +131,25 @@
       {% endif %}
 
       {% if narrative.insights %}
-      <div class="insights">
-        <h2>05. 인사이트 <small>Motiv's Value</small></h2>
-        {% if narrative.insights|length == 1 %}
-          <p>{{ narrative.insights[0] }}</p>
-        {% else %}
-          <ul>
-            {% for item in narrative.insights %}
-            <li>{{ item }}</li>
-            {% endfor %}
-          </ul>
+        {% set _real_insights = narrative.insights | reject('equalto', '') | list %}
+        {% if _real_insights %}
+        <div class="insights">
+          <h2>05. 인사이트 <small>Motiv's Value</small></h2>
+          {% if _real_insights | length == 1 %}
+            <p>{{ _real_insights[0] }}</p>
+          {% else %}
+            <ul>
+              {% for item in narrative.insights %}
+                {% if item %}
+                  <li>{{ item }}</li>
+                {% else %}
+                  <li class="spacer"></li>
+                {% endif %}
+              {% endfor %}
+            </ul>
+          {% endif %}
+        </div>
         {% endif %}
-      </div>
       {% endif %}
 
     </div>

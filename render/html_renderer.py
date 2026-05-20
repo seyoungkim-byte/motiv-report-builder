@@ -95,11 +95,13 @@ def _to_blocks(items: Any) -> list[dict[str, Any]]:
 
     for raw in items:
         # 이미 block dict 형태로 들어오면 그대로 통과 (kind 보장).
-        if isinstance(raw, dict) and raw.get("kind") in ("p", "ul"):
+        if isinstance(raw, dict) and raw.get("kind") in ("p", "ul", "spacer"):
             _flush_ul()
             blocks.append(raw)
             continue
-        # 그 외엔 str 로 강제 후 마커 검사.
+        # None / 비-str 은 무시 또는 str 화.
+        if raw is None:
+            continue
         if not isinstance(raw, str):
             try:
                 raw_s = str(raw)
@@ -109,6 +111,10 @@ def _to_blocks(items: Any) -> list[dict[str, Any]]:
             raw_s = raw
         raw_s = raw_s.strip()
         if not raw_s:
+            # 빈 줄 = spacer 블록. 연속 빈 줄은 1개로 collapse.
+            _flush_ul()
+            if not (blocks and isinstance(blocks[-1], dict) and blocks[-1].get("kind") == "spacer"):
+                blocks.append({"kind": "spacer"})
             continue
         if _is_bullet_line(raw_s):
             cur_ul.append(_md_to_safe_html(_strip_bullet_prefix(raw_s)))
@@ -116,6 +122,11 @@ def _to_blocks(items: Any) -> list[dict[str, Any]]:
             _flush_ul()
             blocks.append({"kind": "p", "text": _md_to_safe_html(raw_s)})
     _flush_ul()
+    # 앞/뒤 spacer 제거 (중간 spacer 만 의미)
+    while blocks and isinstance(blocks[0], dict) and blocks[0].get("kind") == "spacer":
+        blocks.pop(0)
+    while blocks and isinstance(blocks[-1], dict) and blocks[-1].get("kind") == "spacer":
+        blocks.pop()
     return blocks
 
 
