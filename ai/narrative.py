@@ -215,12 +215,61 @@ def _client() -> anthropic.Anthropic:
     return anthropic.Anthropic(api_key=s.anthropic_api_key)
 
 
+def _format_examples(examples: list[dict[str, Any]] | None) -> str:
+    """Render saved narrative examples as few-shot blocks for the system prompt."""
+    if not examples:
+        return ""
+    blocks: list[str] = []
+    for i, ex in enumerate(examples, start=1):
+        nar = ex.get("narrative") or {}
+        if not isinstance(nar, dict) or not nar:
+            continue
+        lines: list[str] = [f"### 예시 {i}"]
+        label = (ex.get("label") or "").strip()
+        if label:
+            lines.append(f"(라벨: {label})")
+        # summary
+        s = nar.get("summary")
+        if isinstance(s, str) and s.strip():
+            lines.append(f"[요약]\n{s.strip()}")
+        # list[str] sections
+        for key, title in [
+            ("overview",   "[01. 캠페인 목적]"),
+            ("background", "[02. 광고 집행 배경]"),
+            ("strategy",   "[03. 적용 전략]"),
+        ]:
+            v = nar.get(key)
+            if isinstance(v, list) and v:
+                joined = "\n".join(str(x) for x in v if str(x).strip())
+                if joined:
+                    lines.append(f"{title}\n{joined}")
+            elif isinstance(v, str) and v.strip():
+                lines.append(f"{title}\n{v.strip()}")
+        # insights
+        ins = nar.get("insights")
+        if isinstance(ins, list) and ins:
+            joined = "\n".join(str(x) for x in ins if str(x).strip())
+            if joined:
+                lines.append(f"[05. 인사이트]\n{joined}")
+        blocks.append("\n".join(lines))
+    if not blocks:
+        return ""
+    header = (
+        "[★ 톤 레퍼런스 — 모티브 팀이 직접 인정한 좋은 작성 예시]\n"
+        "아래 예시들의 문장 톤·구조·강조 패턴(`**굵게**`)·불릿 사용 방식을 "
+        "참고해 새 캠페인 narrative 를 작성하세요. 내용·사실은 모방하지 말고, "
+        "톤만 가져오세요.\n"
+    )
+    return header + "\n\n".join(blocks)
+
+
 def generate_narrative(
     campaign_payload: dict[str, Any],
     *,
     campaign_context_prose: str = "",
     extra_analysis: str = "",
     tone_guide: str = "",
+    tone_examples: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Generate the 5-section narrative draft.
 
@@ -276,6 +325,13 @@ def generate_narrative(
                 "내용·사실은 위 작성 규칙을 따르되, 문장 톤·길이·표현 스타일은 아래를 따르세요.\n\n"
                 + tone_clean
             ),
+        })
+
+    examples_text = _format_examples(tone_examples)
+    if examples_text:
+        system_blocks.append({
+            "type": "text",
+            "text": examples_text,
         })
 
     response = _client().messages.create(
