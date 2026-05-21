@@ -131,6 +131,7 @@ _session_default("headline", "")
 _session_default("subhead", "")
 _session_default("context_prose", "")
 _session_default("extra_analysis", "")
+_session_default("metrics_footnotes", "")
 # Header meta — user-supplied fields not in DB (집행 상품 / 구매 측정 / 태그 / 누적 기간)
 _session_default("hdr_media_products", "")
 _session_default("hdr_measurement", "")
@@ -169,6 +170,7 @@ def _reset_campaign_state(data: CampaignData):
     st.session_state["nar_tldr"] = ""
     st.session_state.context_prose = ""
     st.session_state.extra_analysis = ""
+    st.session_state.metrics_footnotes = ""
     st.session_state.headline = ""
     st.session_state.subhead = ""
     st.session_state.hero_path = None
@@ -194,6 +196,7 @@ def _reset_campaign_state(data: CampaignData):
     st.session_state.subhead = src.get("subhead") or ""
     st.session_state.context_prose = src.get("context_prose") or ""
     st.session_state.extra_analysis = src.get("extra_analysis") or ""
+    st.session_state.metrics_footnotes = src.get("metrics_footnotes") or ""
     nar = src.get("narrative") or {}
     if nar:
         # Backfill missing keys so older builds don't blow up the widgets.
@@ -419,10 +422,11 @@ with col_l:
             _c1, _c2, _c3 = cont.columns([0.30, 0.30, 0.40])
             if _c1.button("✅ 복원하기", key=f"draft_restore_{campaign.campaign_no}",
                           type="primary", width="stretch"):
-                st.session_state.headline       = _draft.get("headline") or ""
-                st.session_state.subhead        = _draft.get("subhead") or ""
-                st.session_state.context_prose  = _draft.get("context_prose") or ""
-                st.session_state.extra_analysis = _draft.get("extra_analysis") or ""
+                st.session_state.headline         = _draft.get("headline") or ""
+                st.session_state.subhead          = _draft.get("subhead") or ""
+                st.session_state.context_prose    = _draft.get("context_prose") or ""
+                st.session_state.extra_analysis   = _draft.get("extra_analysis") or ""
+                st.session_state.metrics_footnotes = _draft.get("metrics_footnotes") or ""
                 _nar = _draft.get("narrative") or {}
                 if isinstance(_nar, dict) and _nar:
                     st.session_state.narrative = _nar
@@ -732,6 +736,7 @@ with col_l:
             extra_analysis=st.session_state.get("extra_analysis", ""),
             narrative=st.session_state.get("narrative") or {},
             metrics_table=_mt_payload,
+            metrics_footnotes=st.session_state.get("metrics_footnotes", ""),
             hdr_media_products=st.session_state.get("hdr_media_products", ""),
             hdr_measurement=st.session_state.get("hdr_measurement", ""),
             hdr_tags_raw=st.session_state.get("hdr_tags_raw", ""),
@@ -896,6 +901,23 @@ with col_r:
             if "metrics_editor" in st.session_state:
                 del st.session_state["metrics_editor"]
             st.rerun()
+
+    # ── 표 주석 — 04 표 아래에 노출되는 자유 형식 footnote ──
+    st.text_area(
+        "📎 표 주석 (선택) — 표 아래에 작게 노출",
+        key="metrics_footnotes",
+        height=90,
+        placeholder=(
+            "예시:\n"
+            "*1 : 시장 평균 대비 지수, 100 = 동일\n"
+            "*2 : 광고 노출자 = CTV 광고 1회 이상 시청 가구"
+        ),
+        help=(
+            "표에 담기 긴 추가 설명을 줄 단위로. 표 indicator/note 안에 `*1` 같은 마커를 "
+            "직접 넣고, 여기에 `*1 : 의미` 식으로 매칭하면 됩니다. "
+            "`**굵게**` 마크업도 동일하게 지원."
+        ),
+    )
 
     st.subheader("5. 히어로 이미지")
     tab_ai, tab_upload = st.tabs(["AI 생성 (Gemini)", "직접 업로드"])
@@ -1176,6 +1198,7 @@ with col_r:
             "campaign": asdict(campaign),
             "narrative": st.session_state.narrative,
             "header_meta": header_meta,
+            "metrics_footnotes": (st.session_state.get("metrics_footnotes") or "").strip(),
             "hero_image_url": Path(st.session_state.hero_path).as_uri()
             if st.session_state.hero_path
             else None,
@@ -1237,6 +1260,7 @@ with col_r:
             extra_analysis=st.session_state.extra_analysis,
             narrative=st.session_state.narrative,
             metrics_table=df.drop(columns=["_select"], errors="ignore").to_dict(orient="records"),
+            metrics_footnotes=st.session_state.get("metrics_footnotes", ""),
             header_meta=header_meta_to_save,
             hero_image=hero_bytes,
             html=html_bytes,

@@ -130,6 +130,13 @@
             {% endfor %}
           </tbody>
         </table>
+        {% if metrics_footnotes_lines %}
+        <div class="metrics-footnotes">
+          {% for line in metrics_footnotes_lines %}
+          <div class="fn-line">{{ line }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
       </div>
       {% endif %}
 

@@ -279,6 +279,14 @@ def _enrich(context: dict[str, Any]) -> dict[str, Any]:
     ctx["subhead"]        = _md_to_safe_html(_raw_s)
     # narrative 의 string 필드들도 동일 변환 (template 에서 그대로 출력)
     ctx["narrative"] = _enrich_narrative(ctx.get("narrative") or {})
+    # 04 표 아래 footnote — 줄 단위 분리 + **bold** 마크업 지원
+    _fn_raw = ctx.get("metrics_footnotes") or ""
+    if isinstance(_fn_raw, str) and _fn_raw.strip():
+        ctx["metrics_footnotes_lines"] = [
+            _md_to_safe_html(ln) for ln in _fn_raw.split("\n") if ln.strip()
+        ]
+    else:
+        ctx["metrics_footnotes_lines"] = []
     return ctx
 
 
