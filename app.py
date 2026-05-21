@@ -35,6 +35,7 @@ from data import (
     CampaignData, CampaignRepository, MetricRow,
     load_build, save_build, last_storage_error,
     get_setting, set_setting,
+    save_example, list_examples, delete_example,
 )
 from render import (
     html_to_pdf,
@@ -440,6 +441,54 @@ with col_l:
                 st.session_state["tone_guide"] = get_setting("tone_guide", "")
                 st.rerun()
 
+        # ── 톤 레퍼런스 (few-shot 예시) ──
+        st.markdown("---")
+        _refs = list_examples(limit=50)
+        st.markdown(
+            f"**📚 톤 레퍼런스** ({len(_refs)}개 저장됨) — "
+            "빌드 후 ‘🎯 톤 레퍼런스로 저장’ 으로 추가. 다음 초안 생성 때 자동 주입."
+        )
+        st.session_state.setdefault("tone_ref_count", 3)
+        st.session_state["tone_ref_count"] = st.slider(
+            "초안 생성 시 주입할 최근 레퍼런스 수",
+            min_value=0, max_value=5,
+            value=int(st.session_state.get("tone_ref_count", 3)),
+            help="0 = 사용 안 함. 너무 많으면 토큰 비용 증가 + 톤이 옛 케이스로 쏠릴 수 있음.",
+            key="tone_ref_count_slider",
+        )
+        if _refs:
+            for _r in _refs:
+                _cols = st.columns([0.72, 0.16, 0.12])
+                _label_disp = _r.get("label") or "(라벨 없음)"
+                _saved_at = (_r.get("saved_at") or "")[:10]
+                _cols[0].caption(
+                    f"#{_r.get('id')} · `{_r.get('campaign_no')}` · {_label_disp} · {_saved_at}"
+                )
+                if _cols[1].button("👁️", key=f"ref_view_{_r['id']}", help="요약 미리보기"):
+                    st.session_state[f"_ref_preview_{_r['id']}"] = True
+                if _cols[2].button("🗑️", key=f"ref_del_{_r['id']}", help="이 레퍼런스 삭제"):
+                    if delete_example(int(_r["id"])):
+                        st.rerun()
+                if st.session_state.get(f"_ref_preview_{_r['id']}"):
+                    with st.expander(f"미리보기 #{_r['id']}", expanded=True):
+                        _nar = _r.get("narrative") or {}
+                        if _nar.get("summary"):
+                            st.markdown(f"**요약**\n\n{_nar['summary']}")
+                        for _k, _t in [
+                            ("overview", "01"), ("background", "02"),
+                            ("strategy", "03"),
+                        ]:
+                            _v = _nar.get(_k)
+                            if isinstance(_v, list) and _v:
+                                st.markdown(f"**{_t}**\n\n" + "\n".join(_v))
+                        if _nar.get("insights"):
+                            st.markdown("**05 인사이트**\n\n" + "\n".join(_nar["insights"]))
+                        if st.button("닫기", key=f"ref_close_{_r['id']}"):
+                            st.session_state[f"_ref_preview_{_r['id']}"] = False
+                            st.rerun()
+        else:
+            st.caption("아직 저장된 레퍼런스가 없습니다.")
+
     st.text_area(
         "캠페인 컨텍스트 (자유 서술 — Claude가 1차 사실로 사용)",
         key="context_prose",
@@ -478,11 +527,14 @@ with col_l:
     if st.button("Claude로 섹션 초안 생성", type="primary"):
         with st.spinner("Claude 호출 중..."):
             try:
+                _ref_count = int(st.session_state.get("tone_ref_count", 3))
+                _examples = list_examples(limit=_ref_count) if _ref_count > 0 else []
                 result = generate_narrative(
                     campaign.to_prompt_dict(),
                     campaign_context_prose=st.session_state.context_prose,
                     extra_analysis=st.session_state.extra_analysis,
                     tone_guide=st.session_state.get("tone_guide", ""),
+                    tone_examples=_examples,
                 )
                 st.session_state.narrative = result
                 # Push generated values into the widget-bound keys so the
@@ -1127,3 +1179,31 @@ with col_r:
                     key=f"dl_{label}_{campaign.campaign_no}",
                     width="stretch",
                 )
+
+        # ── 톤 레퍼런스로 저장 ──
+        # 빌드 결과 narrative 를 톤 레퍼런스 풀에 등록. 다음 초안 생성 때 자동 주입.
+        st.markdown("---")
+        _ref_cols = st.columns([0.55, 0.30, 0.15])
+        _ref_label = _ref_cols[0].text_input(
+            "라벨 (선택, 검색·관리용)",
+            key=f"ref_label_{campaign.campaign_no}",
+            placeholder="예: 시즌 캠페인 표준 톤",
+            label_visibility="collapsed",
+        )
+        _ref_cols[1].caption("← 이 빌드의 narrative 톤을 다음 초안 작성에 참고시키려면")
+        if _ref_cols[2].button(
+            "🎯 톤 레퍼런스",
+            key=f"save_ref_{campaign.campaign_no}",
+            help="이 빌드의 narrative 를 톤 레퍼런스로 Supabase 에 저장. 다음 [Claude로 섹션 초안 생성] 시 최근 N개가 자동 주입됨.",
+            width="stretch",
+        ):
+            _new_id = save_example(
+                campaign_no=campaign.campaign_no,
+                label=_ref_label,
+                narrative=st.session_state.narrative or {},
+                saved_by=user_email,
+            )
+            if _new_id:
+                st.success(f"✅ 톤 레퍼런스 저장됨 (#{_new_id}) — 다음 초안부터 톤 가이드와 함께 자동 주입")
+            else:
+                st.error("저장 실패 — Supabase 연결 또는 narrative_examples 테이블 확인")
