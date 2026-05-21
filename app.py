@@ -36,6 +36,7 @@ from data import (
     load_build, save_build, last_storage_error,
     get_setting, set_setting,
     save_example, list_examples, delete_example,
+    save_draft, load_draft, delete_draft,
 )
 from render import (
     html_to_pdf,
@@ -400,6 +401,61 @@ with col_l:
 
     st.subheader("3. 캠페인 컨텍스트 & 내러티브")
 
+    # ── 임시 저장본(draft) 복원 알림 ──
+    # JWT 만료 / Streamlit Cloud sleep 으로 작성 중인 내용이 날아가는 사고를 막기 위해
+    # narrative_drafts 테이블에 사용자가 '💾 임시 저장' 으로 적재한 내용을 보존.
+    # 캠페인 로드 시 draft 가 빌드보다 새로우면 banner 로 복원 제안.
+    _draft = load_draft(campaign.campaign_no)
+    _build_built_at = (st.session_state.get("last_build") or {}).get("built_at")
+    if _draft and not st.session_state.get(f"_draft_handled_{campaign.campaign_no}"):
+        _draft_at = _draft.get("updated_at") or ""
+        _newer_than_build = (not _build_built_at) or (_draft_at > str(_build_built_at))
+        if _newer_than_build:
+            cont = st.container(border=True)
+            cont.markdown(
+                f"💾 **임시 저장본이 있습니다** — `{_draft_at[:19].replace('T',' ')}` 에 저장됨. "
+                f"마지막 빌드보다 새로워서 작성 중인 내용일 가능성이 큽니다."
+            )
+            _c1, _c2, _c3 = cont.columns([0.30, 0.30, 0.40])
+            if _c1.button("✅ 복원하기", key=f"draft_restore_{campaign.campaign_no}",
+                          type="primary", width="stretch"):
+                st.session_state.headline       = _draft.get("headline") or ""
+                st.session_state.subhead        = _draft.get("subhead") or ""
+                st.session_state.context_prose  = _draft.get("context_prose") or ""
+                st.session_state.extra_analysis = _draft.get("extra_analysis") or ""
+                _nar = _draft.get("narrative") or {}
+                if isinstance(_nar, dict) and _nar:
+                    st.session_state.narrative = _nar
+                    for _k, _ in NARRATIVE_SECTIONS:
+                        _v = _nar.get(_k, "")
+                        if _k in BULLET_SECTIONS and isinstance(_v, list):
+                            st.session_state[f"nar_{_k}"] = "\n".join(_v)
+                        else:
+                            st.session_state[f"nar_{_k}"] = _v if isinstance(_v, str) else ""
+                    st.session_state["nar_insights"] = "\n".join(_nar.get(INSIGHTS_KEY, []))
+                # 헤더 메타
+                st.session_state.hdr_media_products     = _draft.get("hdr_media_products") or ""
+                st.session_state.hdr_measurement        = _draft.get("hdr_measurement") or ""
+                st.session_state.hdr_tags_raw           = _draft.get("hdr_tags_raw") or ""
+                st.session_state.hdr_cumulative_period  = _draft.get("hdr_cumulative_period") or ""
+                # metrics_table
+                _mt = _draft.get("metrics_table") or []
+                if isinstance(_mt, list) and _mt:
+                    _df = pd.DataFrame(_mt)
+                    if "_select" not in _df.columns: _df["_select"] = False
+                    if "_table" not in _df.columns:  _df["_table"]  = True
+                    if "_highlight" not in _df.columns:
+                        _df["_highlight"] = [i == len(_df) - 1 for i in range(len(_df))]
+                    st.session_state.metrics_df = _df
+                st.session_state[f"_draft_handled_{campaign.campaign_no}"] = True
+                st.rerun()
+            if _c2.button("🗑️ 임시본 무시", key=f"draft_discard_{campaign.campaign_no}",
+                          width="stretch"):
+                delete_draft(campaign.campaign_no)
+                st.session_state[f"_draft_handled_{campaign.campaign_no}"] = True
+                st.rerun()
+            _c3.caption("복원하면 현재 화면 내용이 임시본으로 덮어쓰여집니다.")
+
     # ── 톤 가이드 — 모든 캠페인 공통 (Supabase app_settings 저장) ──
     # 한 번 설정하면 마케팅 팀 누구든 같은 톤으로 생성. 캠페인 무관 영구.
     if "tone_guide" not in st.session_state:
@@ -653,6 +709,39 @@ with col_l:
     st.session_state.narrative[INSIGHTS_KEY] = _parse_lines_with_spacers(
         st.session_state["nar_insights"], cap=5
     )
+
+    # ── 💾 임시 저장 — 작성 중인 내용을 Supabase narrative_drafts 에 보관.
+    # JWT 만료/세션 휘발에도 살아남고, 캠페인 재오픈 시 배너로 복원 제안. ──
+    _sd_c1, _sd_c2 = st.columns([0.35, 0.65])
+    if _sd_c1.button(
+        "💾 작성 중인 내용 임시 저장",
+        key=f"save_draft_btn_{campaign.campaign_no}",
+        help="narrative + 헤더 메타 + 성과지표 표를 Supabase 에 즉시 저장. 빌드 안 해도 복원 가능.",
+        width="stretch",
+    ):
+        _df = st.session_state.get("metrics_df")
+        _mt_payload = (
+            _df.drop(columns=["_select"], errors="ignore").to_dict(orient="records")
+            if _df is not None else []
+        )
+        ok = save_draft(
+            campaign_no=campaign.campaign_no,
+            headline=st.session_state.get("headline", ""),
+            subhead=st.session_state.get("subhead", ""),
+            context_prose=st.session_state.get("context_prose", ""),
+            extra_analysis=st.session_state.get("extra_analysis", ""),
+            narrative=st.session_state.get("narrative") or {},
+            metrics_table=_mt_payload,
+            hdr_media_products=st.session_state.get("hdr_media_products", ""),
+            hdr_measurement=st.session_state.get("hdr_measurement", ""),
+            hdr_tags_raw=st.session_state.get("hdr_tags_raw", ""),
+            hdr_cumulative_period=st.session_state.get("hdr_cumulative_period", ""),
+            updated_by=user_email,
+        )
+        if ok:
+            _sd_c2.success("✅ 임시 저장됨 — 세션이 끊겨도 캠페인 재오픈 시 복원 안내")
+        else:
+            _sd_c2.error("저장 실패 — Supabase 연결 또는 narrative_drafts 테이블 확인")
 
 with col_r:
     # ── 4. 성과 지표 — 표시 모드 / 편집 모드 토글 ──────────────
@@ -1157,6 +1246,9 @@ with col_r:
         )
         if ok:
             st.success(f"완료 → {out_dir}  ·  Supabase 에 저장됨 (다음 접속 때 자동 복원)")
+            # 빌드 성공 = draft 가 더 이상 필요 없음. 다음 캠페인 오픈 시 stale banner 안 뜨게.
+            delete_draft(campaign.campaign_no)
+            st.session_state[f"_draft_handled_{campaign.campaign_no}"] = True
         else:
             _err = last_storage_error() or "(원인 미상)"
             st.warning(
