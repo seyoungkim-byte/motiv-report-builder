@@ -103,7 +103,26 @@ def save_build(
         payload["pdf_b64"]  = _b64encode(pdf)
         payload["docx_b64"] = _b64encode(docx)
         payload["txt_b64"]  = _b64encode(txt)
-        client.table(TABLE).upsert(payload, on_conflict="campaign_no").execute()
+        try:
+            client.table(TABLE).upsert(payload, on_conflict="campaign_no").execute()
+        except Exception as e1:
+            # Supabase anon role 의 statement_timeout (보통 8s) 에 큰 binary
+            # upsert 가 걸리면 57014. 산출물 blob 을 빼고 metadata 만 다시 시도해
+            # 사용자 입력은 보존되도록.
+            msg = f"{type(e1).__name__}: {e1}"
+            is_timeout = "57014" in msg or "statement timeout" in msg.lower()
+            if not is_timeout:
+                raise
+            lite = dict(payload)
+            for k in ("hero_image_b64", "html_b64", "pdf_b64", "docx_b64", "txt_b64"):
+                lite[k] = None
+            client.table(TABLE).upsert(lite, on_conflict="campaign_no").execute()
+            _LAST_ERROR = (
+                "산출물 binary 가 너무 커 한 row 에 못 들어가 metadata 만 저장됨. "
+                "다음 캠페인 재오픈 시 narrative·메타·표는 복원되지만 PDF/HTML/DOCX/TXT 는 "
+                "다시 빌드해야 합니다."
+            )
+            return True
         _LAST_ERROR = None
         return True
     except Exception as e:

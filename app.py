@@ -1269,7 +1269,11 @@ with col_r:
             txt=txt_bytes,
         )
         if ok:
-            st.success(f"완료 → {out_dir}  ·  Supabase 에 저장됨 (다음 접속 때 자동 복원)")
+            _warn = last_storage_error()
+            if _warn:
+                st.warning(f"완료 → {out_dir}  ·  ⚠️ {_warn}")
+            else:
+                st.success(f"완료 → {out_dir}  ·  Supabase 에 저장됨 (다음 접속 때 자동 복원)")
             # 빌드 성공 = draft 가 더 이상 필요 없음. 다음 캠페인 오픈 시 stale banner 안 뜨게.
             delete_draft(campaign.campaign_no)
             st.session_state[f"_draft_handled_{campaign.campaign_no}"] = True
