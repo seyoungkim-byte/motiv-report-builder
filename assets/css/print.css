@@ -255,6 +255,20 @@ ul.bul li:last-child { padding-bottom: 0; }
 
 /* ─── 04 Metrics table ──────────────────────────────── */
 .metrics-wrap { margin-bottom: 3mm; }
+/* 04 표 아래 자유 형식 주석 — 표에 담기 긴 설명. * 마커는 amber 강조. */
+.metrics-footnotes {
+  margin: 1.5mm 0 0;
+  padding-top: 1.2mm;
+  border-top: 0.15mm dashed #E1E5EE;
+  font-size: 7.2pt;
+  line-height: 1.45;
+  color: #6b7280;
+}
+.metrics-footnotes .fn-line {
+  padding: 0.3mm 0;
+  word-break: keep-all;
+}
+.metrics-footnotes .fn-line strong { color: #0040C9; font-weight: 700; }
 table.metrics {
   width: 100%;
   border-collapse: collapse;

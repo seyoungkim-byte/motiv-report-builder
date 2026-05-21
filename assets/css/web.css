@@ -237,6 +237,19 @@ ul.bul li:last-child { padding-bottom: 0; }
 
 /* ─── 04 table ──────────────────────────────────────── */
 .metrics-wrap { margin-bottom: 14px; }
+.metrics-footnotes {
+  margin: 8px 0 0;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.metrics-footnotes .fn-line {
+  padding: 2px 0;
+  word-break: keep-all;
+}
+.metrics-footnotes .fn-line strong { color: var(--olive-dark); font-weight: 700; }
 table.metrics { width: 100%; border-collapse: collapse; font-size: 13px; }
 table.metrics thead th {
   background: var(--olive-deep);

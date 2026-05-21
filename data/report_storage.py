@@ -70,6 +70,7 @@ def save_build(
     extra_analysis: str,
     narrative: dict,
     metrics_table: list[dict],
+    metrics_footnotes: str,
     header_meta: dict | None,
     hero_image: bytes | None,
     html: bytes,
@@ -93,6 +94,7 @@ def save_build(
             "extra_analysis": extra_analysis or "",
             "narrative": narrative or {},
             "metrics_table": metrics_table or [],
+            "metrics_footnotes": metrics_footnotes or "",
             "header_meta": header_meta or {},
         })
         # binary payloads — base64 텍스트는 NaN 없음, 별도 추가.
@@ -155,6 +157,7 @@ def load_build(campaign_no: str) -> dict[str, Any] | None:
         "extra_analysis": row.get("extra_analysis") or "",
         "narrative": row.get("narrative") or {},
         "metrics_table": row.get("metrics_table") or [],
+        "metrics_footnotes": row.get("metrics_footnotes") or "",
         "header_meta": row.get("header_meta") or {},
         "hero_image": _b64decode(row.get("hero_image_b64")),
         "files": files,
