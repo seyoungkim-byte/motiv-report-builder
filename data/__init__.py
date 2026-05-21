@@ -6,3 +6,4 @@ from .app_settings import get_setting, set_setting  # noqa: F401
 from .narrative_examples import (  # noqa: F401
     save_example, list_examples, delete_example,
 )
+from .narrative_drafts import save_draft, load_draft, delete_draft  # noqa: F401
