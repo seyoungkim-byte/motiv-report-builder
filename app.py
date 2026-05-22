@@ -1061,6 +1061,111 @@ with col_r:
     if _block_build:
         st.warning("✏️ 4번 성과 지표 영역이 편집 모드입니다. 먼저 [💾 저장] 또는 [❌ 취소] 후 빌드 가능합니다.")
 
+    # ── 🔍 라이브 미리보기 — 빌드 안 하고 즉시 print.html 을 iframe 으로 표시.
+    # 1페이지 (210×297mm) overflow:hidden 그대로 렌더되어 짤리는 부분이 시각화됨.
+    # Playwright/LLM 호출 없음 — 비용 0. #
+    def _render_preview_html() -> str:
+        """현재 session_state 로 print.html.j2 를 렌더해 raw HTML str 반환."""
+        df_p = st.session_state.metrics_df
+        if df_p is None:
+            df_p = pd.DataFrame(columns=["indicator", "value", "note"])
+        valid_records_p = [
+            r for r in df_p.to_dict(orient="records")
+            if str(r.get("indicator", "")).strip() and str(r.get("value", "")).strip()
+        ]
+        table_records_p = [r for r in valid_records_p if r.get("_table", True)]
+        preview_metrics = [
+            MetricRow(
+                indicator=str(r.get("indicator", "")).strip(),
+                value=str(r.get("value", "")).strip(),
+                note=str(r.get("note", "")).strip(),
+                highlight=bool(r.get("_highlight", False)),
+            )
+            for r in table_records_p
+        ]
+        # campaign copy with preview metrics
+        preview_campaign = CampaignData(
+            campaign_no=campaign.campaign_no,
+            campaign_name=campaign.campaign_name,
+            advertiser=campaign.advertiser,
+            industry=campaign.industry,
+            period_start=campaign.period_start,
+            period_end=campaign.period_end,
+            channel=campaign.channel,
+            objective=campaign.objective,
+            metrics_table=preview_metrics,
+        )
+        # header_meta — 빌드 흐름과 동일 가공
+        header_tags_p = [
+            t.strip()
+            for t in (st.session_state.hdr_tags_raw or "").splitlines()
+            if t.strip()
+        ]
+        def _period_month(s: str | None, e: str | None) -> str:
+            if not s: return ""
+            s7 = s[:7].replace("-", ".") if len(s) >= 7 else ""
+            if not e: return s7
+            e7 = e[:7].replace("-", ".") if len(e) >= 7 else ""
+            if not e7 or s7 == e7: return s7
+            if s7[:4] == e7[:4]: return f"{s7} – {e7[5:]}"
+            return f"{s7} – {e7}"
+        header_meta_p = {
+            "media_products":     (st.session_state.hdr_media_products or "").strip(),
+            "measurement_source": (st.session_state.hdr_measurement or "").strip(),
+            "cumulative_period":  (st.session_state.hdr_cumulative_period or "").strip(),
+            "tags":               header_tags_p,
+            "advertiser":   campaign.masked_advertiser,
+            "campaign_no":  campaign.campaign_no,
+            "period_start": campaign.period_start,
+            "period_end":   campaign.period_end,
+            "period_month": _period_month(campaign.period_start, campaign.period_end),
+        }
+        ctx_p = {
+            "headline": st.session_state.headline,
+            "subhead": st.session_state.subhead,
+            "campaign": asdict(preview_campaign),
+            "narrative": st.session_state.narrative,
+            "header_meta": header_meta_p,
+            "metrics_footnotes": (st.session_state.get("metrics_footnotes") or "").strip(),
+            "hero_image_url": Path(st.session_state.hero_path).as_uri()
+            if st.session_state.hero_path else None,
+            "company": {
+                "name": settings.company_name,
+                "url": settings.company_url,
+                "url_secondary": settings.company_url_secondary,
+                "logo": settings.company_logo_url,
+                "description": settings.company_description,
+                "press_contact_name": settings.press_contact_name,
+                "press_contact_email": settings.press_contact_email,
+            },
+            "year": _dt.date.today().year,
+        }
+        from render.html_renderer import _enrich, _css as _css_load
+        from render.jinja_env import build_env
+        env_p = build_env()
+        tpl_p = env_p.get_template("print.html.j2")
+        ctx_enriched = _enrich(ctx_p)
+        return tpl_p.render(**ctx_enriched, css=_css_load("print.css"))
+
+    _prev_col1, _prev_col2 = st.columns([0.35, 0.65])
+    if _prev_col1.button(
+        "🔍 1페이지 미리보기 (라이브)",
+        key="preview_toggle",
+        help="LLM/Playwright 호출 없이 즉시 1페이지 결과를 iframe 으로 표시. 짤리는 영역 그대로 보임.",
+        width="stretch",
+    ):
+        st.session_state["preview_open"] = not st.session_state.get("preview_open", False)
+    if st.session_state.get("preview_open"):
+        _prev_col2.caption("✓ 미리보기 표시 중 — 다시 누르면 닫힘")
+        try:
+            _html = _render_preview_html()
+            import streamlit.components.v1 as _components
+            _components.html(_html, height=1180, scrolling=True)
+        except Exception as _e:
+            st.error(f"미리보기 렌더 실패: {_e}")
+    else:
+        _prev_col2.caption("빌드 전 1페이지 fit 확인용 — 비용 0")
+
     _auto_hero = st.checkbox(
         "🖼️ 히어로 이미지 자동 생성 (Gemini)",
         value=True,

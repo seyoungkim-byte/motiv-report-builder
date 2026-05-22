@@ -55,6 +55,11 @@ class CampaignData:
     def to_prompt_dict(self) -> dict[str, Any]:
         # AI 가 받는 모든 자리에 실제 브랜드명 노출 금지 — 마스킹 라벨로 대체.
         # 검색·로드 단계 (UI) 에서는 self.advertiser / self.campaign_name 그대로 사용.
+        #
+        # 'extras' (DB view_row 전체 + metric_catalog + scraped counters) 는 의도적으로
+        # prompt 에서 제외 — narrative 작성에 사실상 안 쓰이는데 호출당 input 토큰을
+        # ~500~2000 부풀리던 잔재. chart_planner 제거 후로 metric_catalog 도 prompt
+        # 측에선 죽은 데이터. 필요해지면 화이트리스트 키만 다시 추가하는 방식이 안전.
         masked = self.masked_advertiser
         return {
             "campaign_no": self.campaign_no,
@@ -71,9 +76,6 @@ class CampaignData:
             "targeting_summary": self.targeting_summary,
             "audience_insights": self.audience_insights,
             "creative_summary": self.creative_summary,
-            # extras 내부의 텍스트 컬럼 (view_row.campaign_name 등) 에 실 브랜드명이
-            # 그대로 박혀있어 AI 가 그걸 본문에 인용하던 문제를 막기 위해 마스킹.
-            "extras": _mask_extras(self.extras, masked),
         }
 
 
