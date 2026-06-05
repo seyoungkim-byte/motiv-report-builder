@@ -387,10 +387,14 @@ with col_l:
             help="데이터 소스 명시 — GEO 신뢰 신호 + 사람이 보기에 권위 ↑",
         )
         st.text_input(
-            "전체 누적 기간 (선택)",
+            "집행 기간 직접 입력 (선택 · 비우면 DB 기간 자동)",
             key="hdr_cumulative_period",
-            placeholder="예: 전체 누적 2025.11 ~",
-            help="이번 보고 기간 외 누적 집행 시작일이 있을 때만 입력.",
+            placeholder="예: 2026.01 – 02",
+            help=(
+                "여기에 입력하면 헤더의 '집행 기간'으로 그대로 표시됩니다. "
+                "대시보드에 없는 캠페인을 임의로 불러와 쓰는 경우 등 DB 기간이 "
+                "실제와 다를 때 사용하세요. 비우면 DB 캠페인 기간이 월 단위로 자동 표시됩니다."
+            ),
         )
         st.text_area(
             "채널·특징 태그 (선택, 한 줄에 한 태그)",
@@ -1109,16 +1113,18 @@ with col_r:
             if not e7 or s7 == e7: return s7
             if s7[:4] == e7[:4]: return f"{s7} – {e7[5:]}"
             return f"{s7} – {e7}"
+        _manual_period_p = (st.session_state.hdr_cumulative_period or "").strip()
         header_meta_p = {
             "media_products":     (st.session_state.hdr_media_products or "").strip(),
             "measurement_source": (st.session_state.hdr_measurement or "").strip(),
-            "cumulative_period":  (st.session_state.hdr_cumulative_period or "").strip(),
+            "cumulative_period":  _manual_period_p,
             "tags":               header_tags_p,
             "advertiser":   campaign.masked_advertiser,
             "campaign_no":  campaign.campaign_no,
             "period_start": campaign.period_start,
             "period_end":   campaign.period_end,
-            "period_month": _period_month(campaign.period_start, campaign.period_end),
+            "period_month": _manual_period_p
+            or _period_month(campaign.period_start, campaign.period_end),
         }
         ctx_p = {
             "headline": st.session_state.headline,
@@ -1283,18 +1289,21 @@ with col_r:
                 return f"{s7} – {e7[5:]}"
             return f"{s7} – {e7}"
 
+        # 집행 기간: 사용자가 직접 입력했으면 그 값을 그대로, 아니면 DB 기간 자동.
+        _manual_period = (st.session_state.hdr_cumulative_period or "").strip()
         header_meta = {
             # 사용자 입력
             "media_products":     (st.session_state.hdr_media_products or "").strip(),
             "measurement_source": (st.session_state.hdr_measurement or "").strip(),
-            "cumulative_period":  (st.session_state.hdr_cumulative_period or "").strip(),
+            "cumulative_period":  _manual_period,
             "tags":               header_tags,
             # DB 자동
             "advertiser":   campaign.masked_advertiser,
             "campaign_no":  campaign.campaign_no,
             "period_start": campaign.period_start,
             "period_end":   campaign.period_end,
-            "period_month": _fmt_period_month(campaign.period_start, campaign.period_end),
+            "period_month": _manual_period
+            or _fmt_period_month(campaign.period_start, campaign.period_end),
         }
 
         context = {
