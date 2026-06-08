@@ -305,7 +305,25 @@ table.metrics .val {
   font-size: 10pt;
   letter-spacing: -0.01em;
 }
-table.metrics .val.warm { color: #d76e3e; }
+/* 강조 행 — 수치를 손그림 마커펜 동그라미로 감싼다.
+   .v 스팬에만 타원을 둘러 셀 전체가 아닌 숫자만 정확히 동그라미 처리. */
+table.metrics .val.warm { overflow: visible; }
+table.metrics .val .v { display: inline-block; }
+table.metrics .val.warm .v {
+  position: relative;
+  color: #d76e3e;
+  padding: 0.3mm 0.7mm;
+}
+table.metrics .val.warm .v::after {
+  content: "";
+  position: absolute;
+  inset: -1.4mm -2.2mm;
+  border: 0.55mm solid #d76e3e;
+  /* 불규칙 radius + 살짝 회전 = 손으로 친 동그라미 느낌 */
+  border-radius: 47% 53% 49% 51% / 62% 56% 44% 38%;
+  transform: rotate(-3.5deg);
+  pointer-events: none;
+}
 table.metrics .note {
   color: #6b7280;
   font-size: 7.6pt;

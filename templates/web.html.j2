@@ -121,7 +121,7 @@
             {% for m in campaign.metrics_table[:8] %}
             <tr>
               <td class="ind">{{ m.indicator }}</td>
-              <td class="val{% if m.highlight %} warm{% endif %}">{{ m.value }}</td>
+              <td class="val{% if m.highlight %} warm{% endif %}"><span class="v">{{ m.value }}</span></td>
               <td class="note">{{ m.note }}</td>
             </tr>
             {% endfor %}

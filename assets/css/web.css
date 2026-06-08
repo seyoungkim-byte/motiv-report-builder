@@ -277,7 +277,23 @@ table.metrics .val {
   font-size: 16px;
   letter-spacing: -0.01em;
 }
-table.metrics .val.warm { color: var(--coral); }
+/* 강조 행 — 수치를 손그림 마커펜 동그라미로 감싼다 (.v 스팬에만 타원). */
+table.metrics .val.warm { overflow: visible; }
+table.metrics .val .v { display: inline-block; }
+table.metrics .val.warm .v {
+  position: relative;
+  color: var(--coral);
+  padding: 1px 3px;
+}
+table.metrics .val.warm .v::after {
+  content: "";
+  position: absolute;
+  inset: -5px -9px;
+  border: 2px solid var(--coral);
+  border-radius: 47% 53% 49% 51% / 62% 56% 44% 38%;
+  transform: rotate(-3.5deg);
+  pointer-events: none;
+}
 table.metrics .note { color: var(--muted); font-size: 12px; word-break: keep-all; line-height: 1.4; }
 
 /* ─── 05 insights ───────────────────────────────────── */
